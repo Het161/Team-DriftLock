@@ -13,7 +13,10 @@ name: taar-tick
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    # 09 and 39 past, not */30. GitHub delays schedule events under load and
+    # the top of the hour is its most congested slot — its own docs recommend
+    # scheduling off it. The cadence is unchanged; only the offset moved.
+    - cron: "9,39 * * * *"
   workflow_dispatch: {}
 
 # A drifted schedule can start a run while the previous one is still going.
