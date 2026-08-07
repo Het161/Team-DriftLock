@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# verifier baseline of post ids seen on previous runs (machine-local)
+.taar-verify-snapshot.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "verify": "tsx scripts/verify-feed.ts"
   },
   "dependencies": {
     "mongodb": "^6.21.0",
