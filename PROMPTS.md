@@ -389,3 +389,30 @@ fix. No LLM spend, no risk to the running soak.
   fires, and a type import left behind. A clean build is what makes the next
   real warning visible — which matters, since a lint error had already cost two
   failed deploys today.
+
+### Then, share polish and preflight (Priorities 4–5)
+
+Both zero-cost and untouching of pipeline semantics, so the running soak stayed
+comparable.
+
+- **The OG card is a static PNG, not a route.** Rendered by pointing headless
+  Chromium at an HTML file built from the design tokens, so real Newsreader and
+  Fragment Mono are baked into the image. An `ImageResponse` route would have
+  regenerated an identical card on every request for a file that never changes.
+- **The favicon is the blue-pencil mark**, not the red stamp. Stamp-red means
+  SPIKED and nothing else in this product, and a favicon is not a refusal.
+- **A title template moved to the layout**, so every page carries the masthead
+  without each one appending "· TAAR" by hand — which two of them were.
+- **`scripts/preflight.ts` answers a different question from the verifier.**
+  `verify-feed.ts` asks whether the evaluator's integration is correct;
+  preflight asks whether the submission is shippable: routes, the empty-feed
+  contract, both schedulers alive, required files present, and no `SCAFFOLD`
+  text, localhost URLs or Vercel preview URLs left in the tree. **26 passed, 0
+  failed** against production. It refuses to run against localhost, and ends by
+  printing the checklist a script cannot verify — a private repo and a disabled
+  cron job are the two likeliest ways to sink this, and no amount of curl
+  notices either.
+- **A token-drift audit on the deployed stylesheet** rather than the source:
+  all six tokens present, `border-radius` only ever `0` or `1px`, and the single
+  `box-shadow` string is Tailwind's reset variable rather than an applied
+  shadow.
