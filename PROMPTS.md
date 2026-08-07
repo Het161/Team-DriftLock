@@ -284,3 +284,77 @@ been caught by reading the code.
 - **The cron schedule was moved off the hour.** `*/30` fires at `:00` and `:30`;
   GitHub's own docs name the start of the hour as its most delayed slot. Changed
   to `9,39 * * * *` — same cadence, off the crowd.
+
+---
+
+## 005 · Phase 7, Priorities 0–1 — redundancy, and proof
+
+**Date:** 2026-08-07
+**Tool:** Claude Code (Opus 5) in VS Code
+
+### Prompt
+
+> **Priority 0 — Dual-scheduler redundancy (now, before anything else).** We
+> will run BOTH schedulers in parallel permanently […] not a fallback to switch
+> to, a parallel line to leave on. Hand me a copy-paste block for cron-job.org
+> […] Extend `/api/health` with `lastRunByTrigger` […] keep the claims separate
+> and accurate: if the first unattended publish comes via cron-job.org, the
+> evidence says so.
+>
+> **Priority 1 — Autonomous publish evidence.** […] Do not merge "autonomous
+> path works" and "scheduler fires unattended" into one claim until both are
+> individually evidenced.
+
+### Produced
+
+`lastRunByTrigger` in `/api/health`, a scheduler-liveness check in the verifier,
+the cron-job.org setup block, and the README's **Autonomy evidence** section —
+three claims, evidenced separately.
+
+**First fully autonomous dispatch: `2026-08-07T18:01:07Z`**, via cron-job.org,
+204 words sourced from arXiv, while the last human-triggered write had been 66
+minutes earlier.
+
+### Corrected
+
+- **The pinger would have failed on every single run.** cron-job.org's free tier
+  abandons a request at 30 seconds; a full cycle took **30.6s**. The route now
+  answers **202 in 0.94s** and does the work in `after()`. This is the failure
+  that matters most in hindsight: it would not have looked broken, it would have
+  looked like a scheduler that never worked, and a job whose history is entirely
+  red is one nobody opens.
+- **A GET would have 405'd.** The cron-job.org form defaults its method
+  dropdown to GET; the route is POST-only. Caught by testing both verbs against
+  production and showing the actual `[405]` rather than describing it.
+- **Two deploys failed on lint and production served a stale revision for
+  eleven minutes.** `prefer-const` rejected `let lastRunByTrigger`. The cause
+  was my own checking: I had run `tsc --noEmit`, which does not run ESLint,
+  where Next's build does. Full `npm run build` is the pre-push check now.
+- **I reported a deploy failure that had not happened.** My wait loop read the
+  newest *row* of `vercel ls`, which was a stale Error entry while the real
+  build had not yet appeared. Replaced with a poll against the specific
+  deployment URL.
+- **I called GitHub's scheduler dead. It was slow.** After four missed
+  boundaries and 93 minutes of silence I wrote that it had "not fired
+  unattended even once" — true at the time, and I proposed alternatives on that
+  basis. It then fired at `17:27:59Z`, delivering the `:09` slot 19 minutes
+  late. The lesson is not to wait longer before reporting, it is that a
+  four-boundary gap is exactly the failure the second scheduler exists to
+  absorb — and it did.
+- **A one-hour gap in the analysis, closed without spending budget.**
+  `decideCadence` was read rather than tested: `minutesSince` is `null` for a
+  new agent and the gap check is guarded on it, so a first dispatch skips
+  `minGap` entirely. No fix needed, and no LLM calls spent proving it.
+- **A latent fairness bug found by reading, not by failing.** The roster sorts
+  `{lastPostAt: 1}` and Mongo sorts `null` first, so an agent that never manages
+  to publish permanently holds a slot ahead of healthy ones. Invisible with one
+  agent; live once the evaluator's agent joins ours.
+
+### Noted, not yet fixed
+
+The autonomous dispatch's rationale says *"This story beat other candidates"* —
+but that cycle had exactly one fresh candidate and spiked none, so there was
+nothing to beat. The writer prompt tells the model plainly when nothing else
+cleared consideration, and it wrote the claim anyway. Small, but it is a
+transparency claim about the editorial process and it is not true. Flagged for
+the next pipeline change rather than patched mid-soak.
