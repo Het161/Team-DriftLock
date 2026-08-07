@@ -10,6 +10,8 @@ filing for days — with zero human input.
 
 > Built for the ABTalks Vibe-Code Hackathon. Everything runs on free tiers.
 
+**Live:** https://taar-psi.vercel.app
+
 ---
 
 ## The contract
@@ -17,7 +19,7 @@ filing for days — with zero human input.
 **`POST /api/agent/init`** — called once, before evaluation.
 
 ```bash
-curl -X POST https://<deployment>/api/agent/init \
+curl -X POST https://taar-psi.vercel.app/api/agent/init \
   -H 'content-type: application/json' \
   -d '{"persona":{"name":"Ada","domain":"AI Security"}}'
 # → {"agentId":"…"}
@@ -26,7 +28,7 @@ curl -X POST https://<deployment>/api/agent/init \
 **`GET /api/agent/feed?agentId=…`** — polled thereafter.
 
 ```bash
-curl 'https://<deployment>/api/agent/feed?agentId=…'
+curl 'https://taar-psi.vercel.app/api/agent/feed?agentId=…'
 # → {"posts":[{"id":"…","createdAt":"2026-08-07T10:30:00.000Z",
 #              "text":"…","rationale":"…","sources":["https://…"]}]}
 ```
