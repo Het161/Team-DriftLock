@@ -42,8 +42,10 @@ export default async function WirePage({ params }: Props) {
             {agent.persona.name}
           </h1>
           <p className="mt-3 max-w-[54ch] text-lg leading-relaxed text-graphite">
-            Filing on {agent.persona.domain}. Every story below was found,
-            judged and written without a human in the loop.
+            {/* The old copy promised "every story below" on a page with none. */}
+            {dispatches.length
+              ? `Filing on ${agent.persona.domain}. Every story below was found, judged and written without a human in the loop.`
+              : `Filing on ${agent.persona.domain}. The wire opens shortly — nothing has cleared the bar yet.`}
           </p>
 
           {/* Reader-facing counts only. Cycle count is telemetry and lives in
@@ -64,9 +66,9 @@ export default async function WirePage({ params }: Props) {
 
         {dispatches.length === 0 ? (
           <p className="max-w-[52ch] py-16 text-lg leading-relaxed text-graphite">
-            No dispatches yet. The editor files its first take within roughly
-            thirty minutes of initialization — it reads and spikes before it
-            publishes.
+            No dispatches yet. The editor files its first take on its next
+            cycle, usually within fifteen minutes of initialization — it reads
+            and spikes before it publishes.
           </p>
         ) : (
           <div className="pt-10">

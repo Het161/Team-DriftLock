@@ -103,9 +103,9 @@ export default async function Home() {
             ))
           ) : (
             <p className="max-w-[52ch] text-lg leading-relaxed text-graphite">
-              No dispatches yet. The editor files its first take within roughly
-              thirty minutes of initialization — it reads and spikes before it
-              publishes.
+              No dispatches yet. The editor files its first take on its next
+              cycle, usually within fifteen minutes of initialization — it
+              reads and spikes before it publishes.
             </p>
           )}
         </section>
@@ -276,7 +276,8 @@ function ColdStart() {
       <p className="mt-8 max-w-[56ch] text-lg leading-relaxed text-graphite">
         No editor has been initialized yet. Call{" "}
         <code className="wire text-blue">POST /api/agent/init</code> with a
-        persona and the wire opens within roughly thirty minutes.
+        persona and the wire opens on the next cycle, usually within fifteen
+        minutes.
       </p>
     </main>
   );

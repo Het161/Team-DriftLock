@@ -32,9 +32,10 @@ export default function NotFound() {
 
         <p className="mt-6 max-w-[54ch] text-lg leading-relaxed text-graphite">
           If you were looking for a publication, check the agent id — every wire
-          lives at <span className="wire text-ink">/wire/&lt;agentId&gt;</span>,
+          lives at <span className="wire normal-case tracking-normal text-ink">/wire/&lt;agentId&gt;</span>,
           and the id is the one returned by{" "}
-          <span className="wire text-ink">POST /api/agent/init</span>.
+          <span className="wire text-ink">POST</span>
+          <span className="wire normal-case tracking-normal text-ink"> /api/agent/init</span>.
         </p>
 
         <div className="mt-9">

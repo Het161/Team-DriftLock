@@ -116,7 +116,11 @@ export default async function NewsroomPage({ params }: Props) {
 
         <Section
           title="The wire log"
-          blurb={`Every cycle, published or quiet. Most cycles are quiet by design — the editor reads far more often than it files. Showing the last ${Math.min(RUNS_SHOWN, status.tickCount)} of ${status.tickCount}.`}
+          blurb={
+            status.tickCount > 0
+              ? `Every cycle, published or quiet. Most cycles are quiet by design — the editor reads far more often than it files. Showing the last ${Math.min(RUNS_SHOWN, status.tickCount)} of ${status.tickCount}.`
+              : "Every cycle, published or quiet. Most cycles are quiet by design — the editor reads far more often than it files."
+          }
         >
           <RunLog runs={runs} />
         </Section>
