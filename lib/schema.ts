@@ -71,6 +71,16 @@ export type AgentDoc = {
   createdAt: string;
   updatedAt: string;
   lastPostAt: string | null;
+  /**
+   * When this agent was last *processed*, published or not.
+   *
+   * Distinct from lastPostAt, and the roster orders on this one. Ordering by
+   * lastPostAt looks equivalent but starves agents: Mongo sorts null first, so
+   * an agent that never manages to publish keeps a null lastPostAt forever and
+   * permanently holds a slot ahead of agents that are filing normally. With a
+   * per-cycle cap, enough such agents lock the healthy ones out entirely.
+   */
+  lastRunAt?: string | null;
   postCount: number;
 };
 

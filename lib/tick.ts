@@ -92,9 +92,13 @@ export async function runTick(options: {
 
     const roster = await (await agents())
       .find({ status: "active" })
-      // Oldest-neglected first, so a burst of new agents cannot starve an
-      // existing one out of its cadence.
-      .sort({ lastPostAt: 1, createdAt: 1 })
+      // Least-recently-PROCESSED first — not least-recently-published. Mongo
+      // sorts null before dates, so a never-yet-processed agent (the
+      // evaluator's, moments after init) is served first, and every agent then
+      // rotates fairly regardless of whether it manages to publish. Ordering by
+      // lastPostAt instead would let an agent that never files sit permanently
+      // at the front of the queue and lock out the ones that do.
+      .sort({ lastRunAt: 1, createdAt: 1 })
       .limit(MAX_AGENTS_PER_TICK)
       .toArray();
 
@@ -117,6 +121,17 @@ export async function runTick(options: {
         summaries.push(await tickAgent(agent, options.trigger, preferredProvider));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+
+        // Stamp it even on failure. An agent that throws every cycle would
+        // otherwise keep a null lastRunAt and permanently hold first place in
+        // the roster, which is the exact starvation this ordering prevents.
+        await (await agents())
+          .updateOne(
+            { agentId: agent.agentId },
+            { $set: { lastRunAt: new Date().toISOString() } },
+          )
+          .catch(() => {});
+
         summaries.push({
           agentId: agent.agentId,
           persona: agent.persona.name,
@@ -607,6 +622,13 @@ async function finish(input: {
 }): Promise<AgentRunSummary> {
   const finishedAt = new Date();
   const durationMs = finishedAt.getTime() - input.startedAt.getTime();
+
+  // Stamp the agent as processed regardless of outcome. A quiet cycle is still
+  // a turn taken, so the next cycle moves on to whoever has waited longest.
+  await (await agents()).updateOne(
+    { agentId: input.agent.agentId },
+    { $set: { lastRunAt: finishedAt.toISOString() } },
+  );
 
   await recordRun({
     runId: input.runId,

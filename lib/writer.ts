@@ -43,7 +43,14 @@ About referring to your own past work — this matters and is easy to get wrong:
 The rationale is written for an editor reviewing your judgement, not for the reader. It must cover three things explicitly:
   1. why you selected this story,
   2. why it is worth running now rather than later,
-  3. why it beat the specific other candidates on the desk — name them.
+  3. how it compared to the rest of the desk.
+
+On point 3, be literal about what was actually in front of you. If other
+candidates are listed below, name them and say why this one won. If the desk
+says nothing else cleared consideration, then there was nothing to beat — say
+that plainly. Claiming to have "beaten other candidates" on a desk of one is a
+false statement about your own process, and the rationale is the part a reader
+trusts you on.
 
 Return a single JSON object:
 {
@@ -89,7 +96,7 @@ export async function draft(input: {
       ? `WHAT IT BEAT (name these in the rationale)\n${input.beatOut
           .map((c) => `- "${c.title}" (${c.sourceLabel}) — ${c.url}`)
           .join("\n")}`
-      : "WHAT IT BEAT\nNothing else on the desk cleared consideration.",
+      : "WHAT IT BEAT\nNothing — this was the only candidate on the desk this cycle. Do NOT write that it beat other candidates or was chosen over anything; say instead that it was the only story that reached you worth considering.",
     "",
     input.editorJustification
       ? `YOUR OWN NOTE WHEN YOU PICKED IT\n${input.editorJustification}`
