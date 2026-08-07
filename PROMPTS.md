@@ -85,3 +85,58 @@ parts were:
   `prefers-color-scheme: dark` block. A wire service prints on paper; the
   product is light-only by decision, so the block was removed rather than
   given a dark palette.
+
+---
+
+## 002 · Steps 1–3 — deploy, database, and the contract
+
+**Date:** 2026-08-07
+**Tool:** Claude Code (Opus 5) in VS Code
+
+### Prompt
+
+Approval to execute the phase 1–3 plan, plus the four service credentials
+(Atlas, Groq, Gemini, Breeth) and the repo name `taar`. The standing instruction
+from entry 001 governed the work: *production-first — the deployed Vercel URL is
+the source of truth, not localhost; after every milestone we verify against the
+live URL with curl.*
+
+### Produced
+
+- **Phase 1.** Scaffold, token system, three typefaces, first production deploy
+  to https://taar-psi.vercel.app, verified by fetching the deployed stylesheet
+  and grepping it for `#f6f5f1` / `#2743c7` / `#c63b21`.
+- **Phase 2.** `lib/db.ts` (memoised connect promise), `lib/schema.ts` (five
+  document types, the `Charter` type, index construction), `/api/health`.
+  Verified `db:"up"` from the deployment, which is what actually proves Atlas
+  network access allows Vercel — a local ping does not.
+- **Phase 3.** `/api/agent/init`, `/api/agent/feed`, `/api/internal/agent/[id]`,
+  `lib/contract.ts`, and `scripts/verify-feed.ts`. **25 assertions, 0 failures,
+  against production.**
+
+### Corrected
+
+- **Vercel Authentication would have hidden the product from the evaluator.**
+  The deployment-specific and team-scoped URLs (`taar-3t36…vercel.app`,
+  `taar-het-patels-projects-…vercel.app`) both 302 to `vercel.com/login`. Caught
+  by curling the URL instead of opening it in an already-authenticated browser,
+  which would have shown a working page and hidden the problem completely. The
+  production alias `taar-psi.vercel.app` is public, so that is the URL the
+  evaluator gets and the only one anything is verified against.
+- **`taar.vercel.app` belongs to somebody else** (a translation product), hence
+  the `-psi` suffix Vercel assigned. Worth knowing before it gets written into a
+  slide.
+- **The verifier was going to poison the LLM budget.** It calls init on every
+  run, and the tick is specified to publish for *every* active agent — so each
+  verification would have left behind a probe agent permanently consuming part
+  of a ~1,000 request/day free tier. Added `DELETE /api/internal/agent/[id]`
+  behind `CRON_SECRET` and made the verifier clean up after itself.
+- **The five-field rule needed a structural guard, not a careful route.**
+  `PostDoc` deliberately carries extra fields for the newsroom UI and will keep
+  growing. Rather than trusting the feed route to stay in sync, `lib/contract.ts`
+  became the single exit point: a Mongo projection *and* a key-by-key rebuild,
+  so drift cannot leak a sixth key into the evaluator's response.
+- **Sort correctness.** `createdAt` is a string, so the feed's sort is
+  lexicographic. That is only chronological because every value comes from
+  `toISOString()` and is therefore fixed-width — noted in the route, and the
+  verifier independently re-checks ordering after parsing the timestamps.
