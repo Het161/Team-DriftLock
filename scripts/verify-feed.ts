@@ -32,7 +32,9 @@ const C = {
 let passed = 0;
 let failed = 0;
 let skipped = 0;
+let warned = 0;
 const failures: string[] = [];
+const warnings: string[] = [];
 
 function check(label: string, condition: boolean, detail?: string): boolean {
   if (condition) {
@@ -50,6 +52,20 @@ function check(label: string, condition: boolean, detail?: string): boolean {
 function skip(label: string, why: string): void {
   skipped++;
   console.log(`  ${C.yellow}–${C.reset} ${C.dim}${label} — ${why}${C.reset}`);
+}
+
+/**
+ * A warning, not a failure.
+ *
+ * Scheduler liveness is operational health, not contract compliance. A stalled
+ * pinger is worth shouting about, but it must not turn the contract suite red —
+ * that suite's exit code is what tells us whether the evaluator's integration
+ * is broken, and conflating the two would train us to ignore a red run.
+ */
+function warn(label: string, why: string): void {
+  warned++;
+  warnings.push(`${label} — ${why}`);
+  console.log(`  ${C.yellow}!${C.reset} ${label} ${C.dim}— ${why}${C.reset}`);
 }
 
 function section(title: string): void {
@@ -350,6 +366,50 @@ async function main() {
     }
   }
 
+  /* --- scheduler liveness -------------------------------------------------- */
+  section("Schedulers");
+
+  const health = await req("/api/health");
+  const healthBody = isObj(health.body) ? health.body : null;
+
+  check("/api/health responds", health.status === 200, `got ${health.status}`);
+
+  if (healthBody) {
+    const byTrigger = isObj(healthBody.lastRunByTrigger)
+      ? (healthBody.lastRunByTrigger as Record<string, unknown>)
+      : {};
+
+    // Both schedulers run permanently and in parallel — Actions at 9,39 and the
+    // external pinger at 24,54, interleaved so a dead line is covered within
+    // ~15 minutes. Two hours is therefore several missed cycles, not a blip.
+    const STALE_MS = 2 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    for (const trigger of ["actions", "http"] as const) {
+      const at = byTrigger[trigger];
+      if (typeof at !== "string") {
+        warn(`scheduler "${trigger}"`, "has never run");
+        continue;
+      }
+      const age = now - new Date(at).getTime();
+      if (!Number.isFinite(age) || age > STALE_MS) {
+        warn(
+          `scheduler "${trigger}"`,
+          `last ran ${Math.round(age / 60000)} min ago (${at})`,
+        );
+      } else {
+        check(`scheduler "${trigger}" ran within 2h`, true);
+        console.log(`    ${C.dim}last: ${at}${C.reset}`);
+      }
+    }
+
+    const lastTickAt = healthBody.lastTickAt;
+    if (typeof lastTickAt === "string") {
+      const mins = Math.round((now - new Date(lastTickAt).getTime()) / 60000);
+      console.log(`  ${C.dim}last cycle of any kind: ${mins} min ago${C.reset}`);
+    }
+  }
+
   /* --- cleanup ------------------------------------------------------------ */
   section("Cleanup");
 
@@ -368,13 +428,19 @@ async function main() {
   /* --- summary ------------------------------------------------------------ */
   const colour = failed ? C.red : C.green;
   console.log(
-    `\n${colour}${C.bold}${passed} passed · ${failed} failed · ${skipped} skipped${C.reset}\n`,
+    `\n${colour}${C.bold}${passed} passed · ${failed} failed · ${skipped} skipped · ${warned} warning(s)${C.reset}\n`,
   );
   if (failed) {
     console.log(`${C.red}Failed assertions:${C.reset}`);
     for (const f of failures) console.log(`  · ${f}`);
     console.log();
   }
+  if (warned) {
+    console.log(`${C.yellow}Warnings (operational, not contract):${C.reset}`);
+    for (const w of warnings) console.log(`  · ${w}`);
+    console.log();
+  }
+  // Warnings deliberately do not affect the exit code. See warn().
   process.exit(failed ? 1 : 0);
 }
 

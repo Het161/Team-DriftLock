@@ -27,6 +27,22 @@ export async function GET() {
   let lastTickAt: string | null = null;
   let lastTickOutcome: string | null = null;
 
+  /**
+   * Last cycle per trigger.
+   *
+   * TAAR runs two schedulers in parallel on purpose — GitHub Actions and an
+   * external pinger against /api/agent/tick — because over a five-day
+   * unattended judging window the likeliest failure is one free scheduler
+   * quietly stopping. A single `lastTickAt` cannot tell you that half the
+   * redundancy died, since the surviving scheduler keeps it fresh. Splitting it
+   * by trigger is what makes each line independently observable.
+   */
+  let lastRunByTrigger: Record<string, string | null> = {
+    actions: null,
+    http: null,
+    manual: null,
+  };
+
   try {
     latencyMs = await pingDb();
     db = "up";
@@ -34,16 +50,25 @@ export async function GET() {
     await ensureIndexes();
 
     const [a, p, r] = await Promise.all([agents(), posts(), runs()]);
-    const [ac, pc, lastRun] = await Promise.all([
+    const [ac, pc, lastRun, triggers] = await Promise.all([
       a.countDocuments({}),
       p.countDocuments({}),
       r.find({}, { sort: { startedAt: -1 }, limit: 1 }).next(),
+      r
+        .aggregate<{ _id: string; lastAt: string }>([
+          { $group: { _id: "$trigger", lastAt: { $max: "$startedAt" } } },
+        ])
+        .toArray(),
     ]);
 
     agentCount = ac;
     postCount = pc;
     lastTickAt = lastRun?.startedAt ?? null;
     lastTickOutcome = lastRun?.outcome ?? null;
+
+    for (const t of triggers) {
+      if (t._id) lastRunByTrigger[t._id] = t.lastAt ?? null;
+    }
   } catch (err) {
     dbError = err instanceof Error ? err.message : String(err);
   }
@@ -55,6 +80,7 @@ export async function GET() {
     dbError,
     lastTickAt,
     lastTickOutcome,
+    lastRunByTrigger,
     agents: agentCount,
     posts: postCount,
     checkedAt: new Date().toISOString(),
