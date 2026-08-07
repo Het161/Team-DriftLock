@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   TAAR design tokens.
+   The product is a wire service, so the surface is paper — there is no dark
+   mode. Depth comes from rules and layered paper, never from blur or shadow.
+   Every colour in the app must resolve to one of these six.
+--------------------------------------------------------------------------- */
+:root {
+  --paper: #f6f5f1; /* telex stock: cool, not cream */
+  --ink: #1a1915; /* body copy, headlines */
+  --blue-pencil: #2743c7; /* THE accent — editorial marks, links, marginalia */
+  --stamp-red: #c63b21; /* SPIKED / URGENT stamps ONLY. Nowhere else. */
+  --graphite: #8a887f; /* secondary text, datelines */
+  --rule: #e3e0d6; /* dividers, fills, card edges */
+
+  /* One paper layer above --paper, for cards sitting on the desk. */
+  --paper-raised: #fbfaf7;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-blue: var(--blue-pencil);
+  --color-stamp: var(--stamp-red);
+  --color-graphite: var(--graphite);
+  --color-rule: var(--rule);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-wire: var(--font-wire);
+
+  /* Radius tops out at 2px. Nothing in this product is a pill. */
+  --radius-xs: 1px;
+  --radius-sm: 2px;
+  --radius: 2px;
+
+  /* The measure: dispatch bodies never exceed a comfortable reading width. */
+  --container-measure: 68ch;
+}
+
+html {
+  background: var(--paper);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-synthesis-weight: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Wire data: slugs, timestamps, ids, stamps. Always uppercase + letterspaced. */
+.wire {
+  font-family: var(--font-wire), ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+/* Display copy: Newsreader with optical sizing on and tight leading. */
+.display {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.018em;
+  line-height: 1.06;
+  font-weight: 500;
+}
+
+/* Keyboard focus must always be visible, and it is blue-pencilled. */
+:focus-visible {
+  outline: 2px solid var(--blue-pencil);
+  outline-offset: 2px;
+  border-radius: 1px;
+}
+
+::selection {
+  background: var(--blue-pencil);
+  color: var(--paper);
+}
+
+/* Exactly two motions exist in this product (teletype, stamp settle). Both
+   opt out here rather than each implementing its own guard. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
