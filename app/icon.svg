@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!--
+    The blue-pencil mark. Paper ground, ink letterform, and the editor's rule
+    struck under it — the same gesture the marginalia makes on every dispatch.
+    Deliberately not the red stamp: stamp-red means SPIKED and nothing else,
+    and a favicon is not a refusal.
+  -->
+  <rect width="64" height="64" fill="#F6F5F1"/>
+  <path d="M14 17 h36 v7 H36.5 v27 h-9 V24 H14 Z" fill="#1A1915"/>
+  <rect x="14" y="55" width="36" height="4" fill="#2743C7"/>
+</svg>

@@ -13,10 +13,15 @@ type Props = { params: Promise<{ agentId: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { agentId } = await params;
   const agent = await getAgent(agentId);
-  if (!agent) return { title: "Unknown agent — TAAR" };
+  if (!agent) return { title: "Unknown agent" };
+  const description = `Dispatches found, judged and filed autonomously by ${agent.persona.name}, covering ${agent.persona.domain}.`;
   return {
-    title: `${agent.persona.name} — the ${agent.persona.domain} desk · TAAR`,
-    description: `Dispatches filed autonomously by ${agent.persona.name}, covering ${agent.persona.domain}.`,
+    title: `${agent.persona.name} — the ${agent.persona.domain} desk`,
+    description,
+    openGraph: {
+      title: `${agent.persona.name} — the ${agent.persona.domain} desk · TAAR`,
+      description,
+    },
   };
 }
 

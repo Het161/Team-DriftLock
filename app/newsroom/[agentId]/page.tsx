@@ -22,10 +22,12 @@ type Props = { params: Promise<{ agentId: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { agentId } = await params;
   const agent = await getAgent(agentId);
-  if (!agent) return { title: "Unknown agent — TAAR" };
+  if (!agent) return { title: "Unknown agent" };
+  const description = `The charter, the spike log, the memory and the run log behind ${agent.persona.name}'s wire.`;
   return {
-    title: `Newsroom — ${agent.persona.name} · TAAR`,
-    description: `The charter, the spike log and the run log behind ${agent.persona.name}'s wire.`,
+    title: `Newsroom — ${agent.persona.name}`,
+    description,
+    openGraph: { title: `Newsroom — ${agent.persona.name} · TAAR`, description },
   };
 }
 
