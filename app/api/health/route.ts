@@ -37,7 +37,8 @@ export async function GET() {
    * redundancy died, since the surviving scheduler keeps it fresh. Splitting it
    * by trigger is what makes each line independently observable.
    */
-  let lastRunByTrigger: Record<string, string | null> = {
+  // const: only its properties are mutated below, never the binding.
+  const lastRunByTrigger: Record<string, string | null> = {
     actions: null,
     http: null,
     manual: null,
