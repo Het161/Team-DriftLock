@@ -60,6 +60,8 @@ export async function judge(input: {
   charter: Charter;
   candidates: Candidate[];
   memory: RecalledFact[];
+  /** Actually-published dispatches, from Mongo. Concrete repetition check. */
+  priorDispatches: Array<{ title: string; when: string; gist: string }>;
   prefer?: Provider;
 }): Promise<{ decision: EditorialDecision; provider: Provider }> {
   const { candidates } = input;
@@ -85,9 +87,15 @@ export async function judge(input: {
     `Relevance: ${input.charter.standards.thresholds.relevance}`,
     `Hype resistance: ${input.charter.standards.thresholds.hypeResistance}`,
     "",
+    input.priorDispatches.length
+      ? `WHAT YOU HAVE ALREADY FILED (a story you have covered needs a genuine development to run again)\n${input.priorDispatches
+          .map((d) => `- ${d.when} — "${d.title}": ${d.gist}`)
+          .join("\n")}`
+      : "WHAT YOU HAVE ALREADY FILED\nNothing yet — the wire is new.",
+    "",
     memory
-      ? `WHAT YOU HAVE ALREADY ARGUED (do not repeat yourself; a story you have covered needs a genuine development to run again)\n${memory}`
-      : "WHAT YOU HAVE ALREADY ARGUED\nNothing yet — this is early in your run.",
+      ? `POSITIONS YOU HOLD (from your standing brief and past reasoning)\n${memory}`
+      : "",
     "",
     `TODAY'S DESK (${candidates.length} candidates)`,
     ...candidates.map((c, i) =>

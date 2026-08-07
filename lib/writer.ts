@@ -31,13 +31,14 @@ The dispatch:
 - Never invent a fact, a number, a quote, or a URL.
 
 About referring to your own past work — this matters and is easy to get wrong:
-- Your standing positions are what you believe. You may assert them freely.
+- Your standing positions are what you believe. You may assert them freely, in
+  the present tense, as convictions.
 - A claim about your own publishing history — "as I argued last week", "a stance
   I have consistently maintained", "when I covered this earlier" — is a factual
-  claim about the past. Make it ONLY when the prior dispatches listed below
-  actually support it, and refer to what you said, not merely that you said it.
-- If nothing is listed below, you have not published on this before. Write it as
-  what it is: a first look. Do not manufacture a history you do not have.
+  claim about the past. Make it ONLY if it appears under DISPATCHES YOU HAVE
+  ALREADY FILED below, and refer to what you said, not merely that you said it.
+- If that section says you have filed nothing, then you have filed nothing.
+  Write this as what it is: a first look. Do not manufacture a history.
 
 The rationale is written for an editor reviewing your judgement, not for the reader. It must cover three things explicitly:
   1. why you selected this story,
@@ -58,6 +59,8 @@ export async function draft(input: {
   /** The candidates it beat, for the rationale to name. */
   beatOut: Candidate[];
   memory: RecalledFact[];
+  /** Read from Mongo, not memory — the only licence for a continuity callback. */
+  priorDispatches: Array<{ title: string; when: string; gist: string }>;
   editorJustification: string;
   prefer?: Provider;
 }): Promise<{ dispatch: Dispatch; provider: Provider }> {
@@ -92,9 +95,15 @@ export async function draft(input: {
       ? `YOUR OWN NOTE WHEN YOU PICKED IT\n${input.editorJustification}`
       : "",
     "",
+    input.priorDispatches.length
+      ? `DISPATCHES YOU HAVE ALREADY FILED (the only past work you may refer to; build on it where genuinely relevant, do not force a callback)\n${input.priorDispatches
+          .map((d) => `- ${d.when} — "${d.title}": ${d.gist}`)
+          .join("\n")}`
+      : "DISPATCHES YOU HAVE ALREADY FILED\nNone. This is your first dispatch. You have never published on this or any other story, so do not claim or imply that you have — no 'as I have argued', no 'consistently', no callbacks of any kind.",
+    "",
     memory
-      ? `YOUR PUBLISHED HISTORY ON THIS (build on it where genuinely relevant; do not force a callback)\n${memory}`
-      : "YOUR PUBLISHED HISTORY ON THIS\nNone. You have not written about this before, so do not claim or imply that you have. No callbacks, no 'as I have argued', no 'consistently'.",
+      ? `POSITIONS AND CONTEXT YOU HOLD (beliefs, not published work — assert them, but never as things you previously wrote)\n${memory}`
+      : "",
     "",
     "URLS YOU MAY CITE (you may not cite any other URL, and you may not modify these)",
     ...allowed.map((u) => `- ${u}`),

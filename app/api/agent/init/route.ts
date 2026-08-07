@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { after } from "next/server";
 import { agents, ensureIndexes, type AgentDoc, type Charter } from "@/lib/schema";
 import { buildCharter } from "@/lib/charter";
 import { remember } from "@/lib/breeth";
@@ -107,13 +108,19 @@ export async function POST(req: Request) {
   }
 
   // Memory is seeded with the charter so the very first editorial decision has
-  // something to recall. Failing open: remember() never throws.
+  // something to recall — but the evaluator should not wait on it. Awaiting the
+  // Breeth write inline pushed init to ~18s in production; after() runs it once
+  // the response has already been sent. Nothing downstream depends on it having
+  // finished, and remember() never throws.
   if (charter) {
-    await remember(agentId, persona.name, [
-      `covers ${persona.domain} for the TAAR wire.`,
-      `works these beats: ${charter.beats.join(", ")}.`,
-      ...charter.opinions.map((o) => `holds this position: ${o}`),
-    ]);
+    const seed = charter;
+    after(async () => {
+      await remember(agentId, persona.name, [
+        `covers ${persona.domain} for the TAAR wire.`,
+        `works these beats: ${seed.beats.join(", ")}.`,
+        ...seed.opinions.map((o) => `holds this position: ${o}`),
+      ]);
+    });
   }
 
   // Exactly this shape. Nothing else.

@@ -38,6 +38,8 @@ const DAILY_GROQ_SOFT_LIMIT = 800;
 const MAX_AGENTS_PER_TICK = 3;
 /** Candidates the editorial gate actually reads. */
 const DESK_SIZE = 8;
+/** Below this many fresh candidates, widen the search before giving up. */
+const MIN_DESK = 4;
 
 export type AgentRunSummary = {
   agentId: string;
@@ -219,7 +221,30 @@ async function tickAgent(
   }
 
   /* 4 — drop anything already published or already refused. */
-  const fresh = await dedupe(agent.agentId, discovery.candidates);
+  let fresh = await dedupe(agent.agentId, discovery.candidates);
+  let totalFound = discovery.candidates.length;
+
+  // A narrow beat can come back with almost nothing — a niche persona's queries
+  // simply do not produce a story every thirty minutes, and after dedupe the
+  // desk is empty. Since the evaluator chooses the domain and may well choose a
+  // narrow one, one widening pass over a different slice of the sourcePlan runs
+  // before giving up. It costs HTTP requests, not LLM calls.
+  if (fresh.length < MIN_DESK) {
+    const wider = await discover(charter.sourcePlan, {
+      offset: Math.ceil(charter.sourcePlan.length / 2),
+    });
+    totalFound += wider.candidates.length;
+
+    const seen = new Set(fresh.map((c) => normaliseUrl(c.url)));
+    const extra = (await dedupe(agent.agentId, wider.candidates)).filter(
+      (c) => !seen.has(normaliseUrl(c.url)),
+    );
+
+    if (extra.length) {
+      fresh = [...fresh, ...extra];
+      notes.push(`Desk was thin; widened the search and found ${extra.length} more.`);
+    }
+  }
 
   if (!fresh.length) {
     return finish({
@@ -228,7 +253,7 @@ async function tickAgent(
       trigger,
       startedAt,
       outcome: "quiet",
-      candidatesFound: discovery.candidates.length,
+      candidatesFound: totalFound,
       candidatesAfterDedupe: 0,
       spiked: 0,
       published: 0,
@@ -238,14 +263,19 @@ async function tickAgent(
     });
   }
 
-  /* 5 — what does the editor already think about this? */
+  /* 5 — what does the editor already think, and what has it actually filed? */
   const desk = fresh.slice(0, DESK_SIZE);
-  const memory = await recall(
-    agent.agentId,
-    `${agent.persona.domain}: ${desk.map((c) => c.title).join("; ")}`,
-    8,
-  );
-  if (memory.length) notes.push(`Recalled ${memory.length} prior stance(s) from memory.`);
+
+  const [memory, priorDispatches] = await Promise.all([
+    recall(
+      agent.agentId,
+      `${agent.persona.domain}: ${desk.map((c) => c.title).join("; ")}`,
+      8,
+    ),
+    recentDispatches(agent.agentId, 6),
+  ]);
+
+  if (memory.length) notes.push(`Recalled ${memory.length} stance(s) from memory.`);
 
   /* 6 — the editorial gate. */
   const { decision, provider: judgeProvider } = await judge({
@@ -253,6 +283,7 @@ async function tickAgent(
     charter,
     candidates: desk,
     memory,
+    priorDispatches,
     prefer,
   });
   provider = judgeProvider;
@@ -272,7 +303,7 @@ async function tickAgent(
       trigger,
       startedAt,
       outcome: "quiet",
-      candidatesFound: discovery.candidates.length,
+      candidatesFound: totalFound,
       candidatesAfterDedupe: fresh.length,
       spiked: refused.length,
       published: 0,
@@ -289,7 +320,7 @@ async function tickAgent(
       trigger,
       startedAt,
       outcome: "quiet",
-      candidatesFound: discovery.candidates.length,
+      candidatesFound: totalFound,
       candidatesAfterDedupe: fresh.length,
       spiked: refused.length,
       published: 0,
@@ -306,7 +337,7 @@ async function tickAgent(
       trigger,
       startedAt,
       outcome: "skipped",
-      candidatesFound: discovery.candidates.length,
+      candidatesFound: totalFound,
       candidatesAfterDedupe: fresh.length,
       spiked: refused.length,
       published: 0,
@@ -324,6 +355,7 @@ async function tickAgent(
     winner,
     beatOut,
     memory,
+    priorDispatches,
     editorJustification: decision.winnerJustification,
     prefer,
   });
@@ -373,7 +405,7 @@ async function tickAgent(
     trigger,
     startedAt,
     outcome: "published",
-    candidatesFound: discovery.candidates.length,
+    candidatesFound: totalFound,
     candidatesAfterDedupe: fresh.length,
     spiked: refused.length,
     published: 1,
@@ -451,6 +483,41 @@ async function persistRejections(
     .filter((d): d is RejectionDoc => d !== null);
 
   if (docs.length) await (await rejections()).insertMany(docs);
+}
+
+/**
+ * What this agent has actually published, from Mongo.
+ *
+ * Deliberately not read from Breeth. Memory holds two different kinds of fact —
+ * charter seeds ("Meridian holds this position: …") and dispatch records
+ * ("Meridian published a dispatch about …") — and they are indistinguishable to
+ * a prompt. A brand-new agent recalls eight stances from its own charter, which
+ * reads exactly like a publishing history it does not have. That is how the
+ * first live dispatch ended up claiming a position it had "consistently
+ * maintained" on day one.
+ *
+ * So: Mongo is the authority on what was published, Breeth is the authority on
+ * what is believed. Only the former may license a continuity callback.
+ */
+export type PriorDispatch = { title: string; when: string; gist: string };
+
+async function recentDispatches(agentId: string, limit: number): Promise<PriorDispatch[]> {
+  const docs = await (await posts())
+    .find(
+      { agentId },
+      {
+        sort: { createdAt: -1 },
+        limit,
+        projection: { _id: 0, createdAt: 1, text: 1, candidate: 1 },
+      },
+    )
+    .toArray();
+
+  return docs.map((d) => ({
+    title: d.candidate?.title ?? "(untitled)",
+    when: d.createdAt.slice(0, 10),
+    gist: firstSentences(d.text, 1),
+  }));
 }
 
 async function countPostsToday(agentId: string, now: Date): Promise<number> {

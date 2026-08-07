@@ -81,13 +81,18 @@ const UA = "TAAR/1.0 (autonomous wire service; https://github.com/Het161/taar)";
 /* Entry point                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export async function discover(sourcePlan: string[]): Promise<DiscoveryReport> {
+export async function discover(
+  sourcePlan: string[],
+  options: { offset?: number } = {},
+): Promise<DiscoveryReport> {
   const plan = sourcePlan.map((k) => k.trim()).filter(Boolean);
   if (!plan.length) return { candidates: [], adapters: [] };
 
   // Rotate which slice of the plan each adapter uses, keyed to the 30-minute
-  // schedule so successive ticks genuinely cover different ground.
-  const slot = Math.floor(Date.now() / (30 * 60_000));
+  // schedule so successive ticks genuinely cover different ground. `offset`
+  // lets the caller ask for a different slice — used to widen the search when a
+  // niche beat comes back near-empty.
+  const slot = Math.floor(Date.now() / (30 * 60_000)) + (options.offset ?? 0);
   const pick = (count: number, offset: number) =>
     Array.from(
       { length: Math.min(count, plan.length) },
@@ -98,11 +103,15 @@ export async function discover(sourcePlan: string[]): Promise<DiscoveryReport> {
   // between them would halve each one's coverage and, worse, mean they never
   // surface the same story — which is exactly when the dedupe precedence below
   // does its job of keeping Bing's clean publisher link over Google's redirect.
-  const newsKeywords = pick(2, 2);
+  const newsKeywords = pick(3, 2);
 
   const settled = await Promise.all([
-    run("hackernews", () => fromHackerNews(pick(3, 0))),
-    run("arxiv", () => fromArxiv(pick(2, 1))),
+    run("hackernews", () => fromHackerNews(pick(4, 0))),
+    // One query only. arXiv's rate limit makes it the slowest adapter by far,
+    // and a second keyword costs a mandatory 3s pause plus another 10s timeout
+    // risk — which pushed whole ticks past 50s. Research is a garnish on this
+    // wire, not the main course; one query per pass is the right trade.
+    run("arxiv", () => fromArxiv(pick(1, 1))),
     run("googlenews", () => fromGoogleNews(newsKeywords)),
     run("bingnews", () => fromBingNews(newsKeywords)),
   ]);
@@ -295,41 +304,57 @@ async function fromHackerNews(keywords: string[]): Promise<Candidate[]> {
 /* arXiv (Atom)                                                                */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * arXiv asks API clients for roughly one request every three seconds, and
+ * enforces it: firing this adapter's keywords in parallel like the others
+ * reliably drew HTTP 429 and silently removed research from the wire. So this
+ * one adapter runs its queries sequentially with the requested spacing. It is
+ * the slowest of the four by design, and still well inside a tick.
+ */
 async function fromArxiv(keywords: string[]): Promise<Candidate[]> {
-  const batches = await Promise.all(
-    keywords.map(async (keyword) => {
-      const url =
-        `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(`"${keyword}"`)}` +
-        `&sortBy=submittedDate&sortOrder=descending&max_results=8`;
-      const xml = await get(url).then((r) => r.text());
+  const batches: Candidate[][] = [];
 
-      return blocks(xml, "entry").map<Candidate>((entry) => {
-        // A revised preprint is news on its revision date, not its original one.
-        const published = tag(entry, "published") ?? "";
-        const updated = tag(entry, "updated") ?? "";
-        const newest = [published, updated]
-          .filter(Boolean)
-          .map((d) => new Date(d).getTime())
-          .filter((t) => Number.isFinite(t))
-          .sort((a, b) => b - a)[0];
-
-        return {
-          title: clean(tag(entry, "title") ?? ""),
-          url: clean(tag(entry, "id") ?? "").replace(/^http:/, "https:"),
-          source: "arxiv",
-          sourceLabel: "arXiv",
-          publishedAt: new Date(newest ?? 0).toISOString(),
-          snippet: clean(tag(entry, "summary") ?? "").slice(0, 400),
-          signal: "preprint",
-          keyword,
-          corroboration: 1,
-          alsoReported: [],
-        };
-      });
-    }),
-  );
+  for (const [i, keyword] of keywords.entries()) {
+    if (i > 0) await sleep(3_000);
+    batches.push(await arxivQuery(keyword));
+  }
 
   return batches.flat();
+}
+
+async function arxivQuery(keyword: string): Promise<Candidate[]> {
+  const url =
+    `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(`"${keyword}"`)}` +
+    `&sortBy=submittedDate&sortOrder=descending&max_results=8`;
+  const xml = await get(url).then((r) => r.text());
+
+  return blocks(xml, "entry").map<Candidate>((entry) => {
+    // A revised preprint is news on its revision date, not its original one.
+    const published = tag(entry, "published") ?? "";
+    const updated = tag(entry, "updated") ?? "";
+    const newest = [published, updated]
+      .filter(Boolean)
+      .map((d) => new Date(d).getTime())
+      .filter((t) => Number.isFinite(t))
+      .sort((a, b) => b - a)[0];
+
+    return {
+      title: clean(tag(entry, "title") ?? ""),
+      url: clean(tag(entry, "id") ?? "").replace(/^http:/, "https:"),
+      source: "arxiv",
+      sourceLabel: "arXiv",
+      publishedAt: new Date(newest ?? 0).toISOString(),
+      snippet: clean(tag(entry, "summary") ?? "").slice(0, 400),
+      signal: "preprint",
+      keyword,
+      corroboration: 1,
+      alsoReported: [],
+    };
+  });
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /* -------------------------------------------------------------------------- */
