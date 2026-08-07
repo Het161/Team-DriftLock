@@ -207,3 +207,80 @@ Almost everything below came from *running* the thing, not from reading it.
 - **Init took ~18s** because it awaited the Breeth seed. Moved into `after()`.
 - **The lock was tested, not assumed** — two ticks fired simultaneously, one
   published, the other logged "lease held by another run" and exited.
+
+---
+
+## 004 · Step 6 — the three pages
+
+**Date:** 2026-08-07
+**Tool:** Claude Code (Opus 5) in VS Code
+
+### Prompt
+
+> Build order: (1) `/wire/[agentId]` — dispatch card with the blue-pencil
+> marginalia exactly per the design tokens, rendered against Kaveri's live data;
+> (2) `/newsroom/[agentId]` — charter card, The Spike log with stamps, wire run
+> log, memory panel; (3) front page last, embedding the live wire strip (real
+> status from Mongo, not hardcoded) and real dispatches above the fold. After
+> each page: screenshot at 390px and desktop, self-critique against the tokens,
+> then show me before moving on.
+
+### Produced
+
+All three pages, server-rendered from Mongo directly rather than through our own
+HTTP API, plus `lib/queries.ts`, `lib/format.ts` and six components. Screenshots
+at 1440 and 390 after each page, captured with `reducedMotion: "reduce"` so
+animations show their settled end state and captures are deterministic.
+
+### Corrected
+
+Every one of these came from *looking at the rendered page*. None would have
+been caught by reading the code.
+
+- **The dateline rendered as the single letter "T".** The teletype effect
+  animated `width`, which makes the reveal a layout property — the final frame
+  has to land on a `calc()` that exactly equals the rendered text, and it
+  didn't.
+- **Fixing that broke 390px differently.** Switching to `clip-path` fixed
+  desktop, but `clip-path` on a multi-line **inline** element clips everything
+  after the first fragment in Chromium, so the wrapped slug silently lost
+  "2026 · 15:33 UTC". Found by probing computed styles — the box was 28px tall,
+  i.e. two lines, one of them invisible. Both bugs ate the one line saying which
+  story this is and when it moved. Now `inline-block` above 768px only, plain
+  text below, and it fails safe: no animation means no clip.
+- **The newsroom was 23,000px tall.** Forty spikes buried the charter, the
+  memory panel and the run log. Capped at 12 — with the true totals counted by a
+  separate aggregate, since deriving them from a truncated list would understate
+  the number that most demonstrates judgement.
+- **Breeth's metadata contradicts itself, so it was cut.** The memory panel
+  showed `intent_meta.why_connected` under each fact. The edge "Kaveri covers
+  Sustainable AI Data Centers" came back annotated "states Kaveri's position on
+  proprietary chip architectures moving toward open standards". Checked against
+  the raw API rather than assuming a mapping bug — roughly half were attached to
+  the wrong fact. On a page whose purpose is proving the editor's memory is
+  real, an explanation that contradicts what it explains is worse than none.
+  Only `fact` renders now; the fields are still stored.
+- **A CSS layering bug made the run log unreadable.** Notes rendered in ALL CAPS
+  despite `normal-case`, because `.wire` sat *outside* Tailwind's layers and
+  unlayered CSS outranks anything layered. Moved `.wire` and `.display` into
+  `@layer components` so utilities win, which is the expected mental model.
+- **A `box-shadow` slipped into the spike stamp** for its ink texture, in a
+  design system that bans shadows outright — including inset ones. Replaced with
+  a border plus an offset outline.
+- **API paths were being uppercased** by `.wire` on the front page, which is
+  simply wrong for a URL. And the wire link read "All 1 dispatches".
+- **`Field` rendered `<section>`**, nesting sections inside the charter card,
+  and the source plan printed a separator after its last item.
+- **Cycle count was cut from the wire masthead** on self-critique — telemetry on
+  a reader-facing page. It belongs in the newsroom run log, where it means
+  something.
+
+### Also this session
+
+- **The GitHub token could not push the workflow.** Scopes were
+  `gist, read:org, repo` with no `workflow`, so both `git push` and the contents
+  API refused the file (the latter as a disguised 404). Resolved by running the
+  device-code flow and surfacing the one-time code.
+- **The cron schedule was moved off the hour.** `*/30` fires at `:00` and `:30`;
+  GitHub's own docs name the start of the hour as its most delayed slot. Changed
+  to `9,39 * * * *` — same cadence, off the crowd.
