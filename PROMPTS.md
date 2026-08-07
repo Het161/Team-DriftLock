@@ -350,11 +350,42 @@ minutes earlier.
   to publish permanently holds a slot ahead of healthy ones. Invisible with one
   agent; live once the evaluator's agent joins ours.
 
-### Noted, not yet fixed
+### Then, overnight hardening
 
-The autonomous dispatch's rationale says *"This story beat other candidates"* —
-but that cycle had exactly one fresh candidate and spiked none, so there was
-nothing to beat. The writer prompt tells the model plainly when nothing else
-cleared consideration, and it wrote the claim anyway. Small, but it is a
-transparency claim about the editorial process and it is not true. Flagged for
-the next pipeline change rather than patched mid-soak.
+**Prompt:** *"but i will not wake all night"* → chose **"do the zero-cost
+hardening"**: agent fairness, empty states and 404, and the rationale-honesty
+fix. No LLM spend, no risk to the running soak.
+
+- **Groq's limits were checked, not assumed.** The worry was a daily token cap
+  starving the soak while nobody watched. The headers say
+  `limit-requests: 1000` and `limit-tokens: 12000` — and the token limit is
+  **per minute**, resetting in 205ms, against cycles roughly ten minutes apart.
+  Observed usage is about one call per cycle, ~144/day, so the real headroom is
+  around 7×. Many cycles cost zero calls because dedupe leaves nothing fresh.
+- **The fairness bug was fixed properly.** Ordering now uses `lastRunAt` and
+  every processed agent is stamped — *including one that threw*, which was the
+  subtle half: an agent failing every cycle would otherwise keep a null
+  timestamp and hold first place forever, recreating the starvation from the
+  other direction.
+- **The rationale-honesty fix.** The prompt already said nothing else cleared
+  consideration; it was not forceful enough. It now forbids the claim outright
+  and the system prompt explains why — the rationale is the part a reader
+  trusts us on, so a false statement about our own process costs more there
+  than anywhere else.
+- **Empty states were rendered, not imagined.** A paused agent was inserted
+  straight into Mongo — `status: "paused"`, so the roster ignores it and the
+  check cost nothing — and the pages screenshotted from production. Two lies
+  surfaced immediately: the wire's masthead promised *"every story below was
+  found, judged and written without a human in the loop"* on a page with no
+  stories below it, and the newsroom's run log read *"Showing the last 0 of
+  0."*
+- **Both first-dispatch promises were stale.** They said "within roughly thirty
+  minutes", written when Actions at `*/30` was the only scheduler. With the
+  pinger at `*/15` the honest claim is the next cycle, usually within fifteen.
+- **The 404 uppercased its own URLs** — `/WIRE/<AGENTID>`, `/API/AGENT/INIT` —
+  the same `.wire` text-transform that had already hit the front page, and just
+  as wrong on a path someone is meant to copy.
+- **Two lint warnings cleared.** An `eslint-disable` for a rule that no longer
+  fires, and a type import left behind. A clean build is what makes the next
+  real warning visible — which matters, since a lint error had already cost two
+  failed deploys today.
