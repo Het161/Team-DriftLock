@@ -140,3 +140,70 @@ live URL with curl.*
   lexicographic. That is only chronological because every value comes from
   `toISOString()` and is therefore fixed-width — noted in the route, and the
   verifier independently re-checks ordering after parsing the timestamps.
+
+---
+
+## 003 · Step 4 — the tick
+
+**Date:** 2026-08-07
+**Tool:** Claude Code (Opus 5) in VS Code
+
+### Prompt
+
+Approval of the phase-4 plan: lock, LLM layer, discovery, charter, editorial
+gate, writer, cadence, both triggers, and the Actions workflow — with the gates
+being *a real post in the production feed*, then the same with no local machine
+involved.
+
+### Produced
+
+`lib/{lock,llm,breeth,discovery,charter,cadence,editor,writer,tick}.ts`,
+`scripts/tick.ts`, `POST /api/agent/tick`, and charter generation moved into
+init. First live cycle published in 29s using 3 LLM calls, and spiked 7.
+
+### Corrected
+
+Almost everything below came from *running* the thing, not from reading it.
+
+- **The spec's Gemini fallback did not work.** `gemini-2.0-flash` returns
+  `429 … limit: 0` on this key, and every 2.5 model 404s on the `v1beta` path
+  the docs steer you to. Found `v1/models/gemini-2.5-flash` by listing the
+  models the key can actually see. Had this not been probed before writing the
+  code, the fallback would have looked fine and only failed the first time Groq
+  was down — i.e. exactly when it was needed.
+- **Breeth is a graph, not a store.** "TAAR connectivity probe: the editor is
+  being wired up" produced 1 entity and **0 edges** — unrecallable. The same
+  content as full sentences naming the subject produced **8 entities and 6
+  edges**. So `remember()` renders structured facts into subject-verb prose and
+  never uses pronouns. This single probe changed the design of the memory layer.
+- **A 48-hour freshness window silently deleted arXiv.** For a niche query the
+  newest matching preprint is routinely 4-5 days old. Freshness is now
+  per-source: 48h for news, 14 days for preprints.
+- **Google News links are unpublishable.** They are opaque
+  `news.google.com/rss/articles/CBMi…` redirects that only resolve via in-page
+  JavaScript. Added Bing News *alongside* it — Bing puts the real publisher URL
+  in a query parameter, so it unwraps to a clean link. Both run the **same**
+  queries so they genuinely compete, and dedupe precedence keeps the clean one.
+  Immediately visible in the first dispatch, which cites `thestar.com.my`
+  directly.
+- **The first live desk was 5/8 the same story.** Five outlets' rewrites of one
+  AMD/Taalas announcement, so the editor spent its judgement writing six
+  variations of "this is a press release". Titles are now clustered by word
+  overlap, and the merge count is *kept* and shown to the editor, because wide
+  pickup is real signal that cuts both ways.
+- **The first dispatch ever filed invented a publishing history** — "a stance I
+  have consistently maintained", on day one. The deeper cause was that memory
+  holds charter seeds *and* dispatch records and a prompt cannot tell them
+  apart: a brand-new agent "recalled 8 prior stances" that were merely its own
+  opinions. Fixed structurally — prior dispatches are read from Mongo, which
+  knows what was actually published, and only those license a callback. A
+  first-ever dispatch was then re-tested and came back clean.
+- **A niche persona starved.** "Semiconductor Supply Chains" found two
+  candidates, both already seen. Since the evaluator chooses the domain, a thin
+  desk now triggers one widening pass over a different slice of the sourcePlan —
+  which turned that agent's empty desk into a published dispatch.
+- **arXiv rate-limits at ~1 request per 3s** and was returning a steady 429.
+  Now sequential and single-query; two queries pushed ticks past 50s.
+- **Init took ~18s** because it awaited the Breeth seed. Moved into `after()`.
+- **The lock was tested, not assumed** — two ticks fired simultaneously, one
+  published, the other logged "lease held by another run" and exited.
