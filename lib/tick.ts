@@ -266,16 +266,30 @@ async function tickAgent(
   /* 5 — what does the editor already think, and what has it actually filed? */
   const desk = fresh.slice(0, DESK_SIZE);
 
+  const memoryQuery = `${agent.persona.domain}: ${desk.map((c) => c.title).join("; ")}`;
+
   const [memory, priorDispatches] = await Promise.all([
-    recall(
-      agent.agentId,
-      `${agent.persona.domain}: ${desk.map((c) => c.title).join("; ")}`,
-      8,
-    ),
+    recall(agent.agentId, memoryQuery, 8),
     recentDispatches(agent.agentId, 6),
   ]);
 
-  if (memory.length) notes.push(`Recalled ${memory.length} stance(s) from memory.`);
+  if (memory.length) {
+    notes.push(`Recalled ${memory.length} stance(s) from memory.`);
+    // Persisted so the newsroom can show what actually informed this decision
+    // without making a live Breeth call while rendering a page.
+    await (await agents()).updateOne(
+      { agentId: agent.agentId },
+      {
+        $set: {
+          memorySnapshot: {
+            facts: memory,
+            at: new Date().toISOString(),
+            query: memoryQuery.slice(0, 300),
+          },
+        },
+      },
+    );
+  }
 
   /* 6 — the editorial gate. */
   const { decision, provider: judgeProvider } = await judge({

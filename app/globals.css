@@ -54,22 +54,31 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Wire data: slugs, timestamps, ids, stamps. Always uppercase + letterspaced. */
-.wire {
-  font-family: var(--font-wire), ui-monospace, monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.6875rem;
-  line-height: 1.4;
-}
+/* These live in @layer components on purpose.
+   Unlayered CSS outranks anything in Tailwind's layers, so an unlayered .wire
+   silently beat every utility placed on the same element — run-log notes kept
+   rendering in caps despite normal-case, because .wire's text-transform won.
+   Inside the components layer the utilities layer comes later and wins, which
+   is the expected mental model: the class sets the default, a utility overrides
+   it. */
+@layer components {
+  /* Wire data: slugs, timestamps, ids, stamps. Uppercase + letterspaced. */
+  .wire {
+    font-family: var(--font-wire), ui-monospace, monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.6875rem;
+    line-height: 1.4;
+  }
 
-/* Display copy: Newsreader with optical sizing on and tight leading. */
-.display {
-  font-family: var(--font-display), ui-serif, Georgia, serif;
-  font-optical-sizing: auto;
-  letter-spacing: -0.018em;
-  line-height: 1.06;
-  font-weight: 500;
+  /* Display copy: Newsreader with optical sizing on and tight leading. */
+  .display {
+    font-family: var(--font-display), ui-serif, Georgia, serif;
+    font-optical-sizing: auto;
+    letter-spacing: -0.018em;
+    line-height: 1.06;
+    font-weight: 500;
+  }
 }
 
 /* Keyboard focus must always be visible, and it is blue-pencilled. */

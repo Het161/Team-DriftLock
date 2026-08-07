@@ -34,6 +34,25 @@ export async function getSpikes(agentId: string, limit = 40): Promise<RejectionD
     .toArray();
 }
 
+/**
+ * Verdict totals across the whole history.
+ *
+ * Counted separately from getSpikes() because that list is capped for layout,
+ * and deriving the headline numbers from a truncated list would quietly
+ * understate how much the editor has refused — which is the one number on the
+ * page that most demonstrates it is exercising judgement.
+ */
+export async function getSpikeCounts(
+  agentId: string,
+): Promise<{ spiked: number; held: number }> {
+  const col = await rejections();
+  const [spiked, held] = await Promise.all([
+    col.countDocuments({ agentId, verdict: "spike" }),
+    col.countDocuments({ agentId, verdict: "hold" }),
+  ]);
+  return { spiked, held };
+}
+
 export async function getRuns(agentId: string, limit = 24): Promise<RunDoc[]> {
   return (await runs())
     .find({ agentId }, { sort: { startedAt: -1 }, limit, projection: { _id: 0 } })

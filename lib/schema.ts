@@ -54,6 +54,20 @@ export type AgentDoc = {
   status: "active" | "paused";
   /** Marks our own demo agent so the UI can find it without hardcoding an id. */
   isDemo?: boolean;
+  /**
+   * What memory returned on the most recent cycle.
+   *
+   * Written by the tick rather than queried when the newsroom renders. Two
+   * reasons: a page render should not hang on a third-party API that is allowed
+   * to be slow, and more importantly this is the recall that actually informed
+   * the last editorial decision — which is a truer answer to "what does the
+   * editor remember" than a fresh query with a different phrasing would be.
+   */
+  memorySnapshot?: {
+    facts: Array<{ fact: string; kind: string | null; why: string | null }>;
+    at: string;
+    query: string;
+  };
   createdAt: string;
   updatedAt: string;
   lastPostAt: string | null;
