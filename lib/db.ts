@@ -13,7 +13,6 @@ import { MongoClient, type Db } from "mongodb";
 const DB_NAME = "taar";
 
 declare global {
-  // eslint-disable-next-line no-var
   var __taarMongo: Promise<MongoClient> | undefined;
 }
 

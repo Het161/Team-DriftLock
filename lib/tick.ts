@@ -6,7 +6,6 @@ import {
   runs,
   ensureIndexes,
   type AgentDoc,
-  type Charter,
   type PostDoc,
   type RejectionDoc,
   type RunDoc,
