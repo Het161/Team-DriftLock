@@ -3,7 +3,7 @@
  *
  * Design rules:
  *  - A dead adapter is skipped, never fatal. Three of four still makes a wire.
- *  - Every adapter has its own 10s budget, so one slow host cannot eat the tick.
+ *  - Each adapter has its own fetch budget, so one slow host cannot eat the tick.
  *  - Keywords rotate by clock slot, so consecutive ticks look at different parts
  *    of the charter's sourcePlan. Without this the agent re-reads the same three
  *    queries forever and the feed narrows to one corner of its own beat.
@@ -57,7 +57,21 @@ export type DiscoveryReport = {
   adapters: AdapterStatus[];
 };
 
-const FETCH_TIMEOUT_MS = 10_000;
+/**
+ * Per-adapter fetch budgets.
+ *
+ * arXiv gets nearly double. Measured cold it answered in 15.8s while the news
+ * adapters return in well under two — so a shared 10s budget was not
+ * "protecting the tick", it was quietly deleting research from the wire on
+ * arXiv's slower days and logging it as a timeout. It is the only adapter that
+ * runs a single query, so the extra headroom costs at most one slow request.
+ */
+const FETCH_TIMEOUT_MS: Record<SourceKey, number> = {
+  hackernews: 10_000,
+  googlenews: 10_000,
+  bingnews: 10_000,
+  arxiv: 18_000,
+};
 
 /** See the note above: preprints and news age at completely different rates. */
 const MAX_AGE_HOURS: Record<SourceKey, number> = {
@@ -108,8 +122,8 @@ export async function discover(
   const settled = await Promise.all([
     run("hackernews", () => fromHackerNews(pick(4, 0))),
     // One query only. arXiv's rate limit makes it the slowest adapter by far,
-    // and a second keyword costs a mandatory 3s pause plus another 10s timeout
-    // risk — which pushed whole ticks past 50s. Research is a garnish on this
+    // and a second keyword costs a mandatory 3s pause plus another full timeout
+    // window — which pushed whole ticks past 50s. Research is a garnish on this
     // wire, not the main course; one query per pass is the right trade.
     run("arxiv", () => fromArxiv(pick(1, 1))),
     run("googlenews", () => fromGoogleNews(newsKeywords)),
@@ -244,10 +258,10 @@ async function run(
   }
 }
 
-async function get(url: string): Promise<Response> {
+async function get(url: string, source: SourceKey): Promise<Response> {
   const res = await fetch(url, {
     headers: { "user-agent": UA, accept: "*/*" },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS[source]),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${new URL(url).host}`);
@@ -276,7 +290,7 @@ async function fromHackerNews(keywords: string[]): Promise<Candidate[]> {
       const url =
         `https://hn.algolia.com/api/v1/search_by_date?query=${encodeURIComponent(keyword)}` +
         `&tags=story&hitsPerPage=8&numericFilters=created_at_i>${since}`;
-      const body = (await get(url).then((r) => r.json())) as { hits?: HnHit[] };
+      const body = (await get(url, "hackernews").then((r) => r.json())) as { hits?: HnHit[] };
 
       return (body.hits ?? [])
         .filter((h) => h.title)
@@ -326,7 +340,7 @@ async function arxivQuery(keyword: string): Promise<Candidate[]> {
   const url =
     `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(`"${keyword}"`)}` +
     `&sortBy=submittedDate&sortOrder=descending&max_results=8`;
-  const xml = await get(url).then((r) => r.text());
+  const xml = await get(url, "arxiv").then((r) => r.text());
 
   return blocks(xml, "entry").map<Candidate>((entry) => {
     // A revised preprint is news on its revision date, not its original one.
@@ -367,7 +381,7 @@ async function fromGoogleNews(keywords: string[]): Promise<Candidate[]> {
       const url =
         `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}` +
         `&hl=en-US&gl=US&ceid=US:en`;
-      const xml = await get(url).then((r) => r.text());
+      const xml = await get(url, "googlenews").then((r) => r.text());
 
       return blocks(xml, "item")
         .slice(0, 8)
@@ -403,7 +417,7 @@ async function fromBingNews(keywords: string[]): Promise<Candidate[]> {
   const batches = await Promise.all(
     keywords.map(async (keyword) => {
       const url = `https://www.bing.com/news/search?q=${encodeURIComponent(keyword)}&format=RSS`;
-      const xml = await get(url).then((r) => r.text());
+      const xml = await get(url, "bingnews").then((r) => r.text());
 
       return blocks(xml, "item")
         .slice(0, 8)
