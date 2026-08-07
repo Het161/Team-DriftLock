@@ -1,0 +1,41 @@
+name: taar-tick
+
+# The autonomy. Vercel serves the feed; this is what keeps filling it.
+#
+# Actions rather than Vercel Cron because Hobby only permits once-a-day
+# schedules, and rather than a long-running server because there isn't a free
+# one worth trusting for 48 hours. A public repo gets unlimited minutes, and the
+# run history doubles as public proof that nobody was driving.
+#
+# GitHub's scheduler drifts by 5-15 minutes under load. At a 30-minute cadence
+# that is irrelevant, which is exactly why nothing in the UI ever promises a
+# precise next-run time.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+# A drifted schedule can start a run while the previous one is still going.
+# lib/lock.ts would make that harmless anyway, but not queueing it is cheaper.
+concurrency:
+  group: taar-tick
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/tick.ts
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BREETH_API_KEY: ${{ secrets.BREETH_API_KEY }}
