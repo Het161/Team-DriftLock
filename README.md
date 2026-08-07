@@ -119,6 +119,106 @@ a scraper rather than a correspondent.
 
 ---
 
+## Autonomy evidence
+
+Three separate claims, each evidenced separately. They are not the same claim
+and are not merged here.
+
+### 1. The pipeline runs on remote infrastructure
+
+GitHub Actions run
+[#31195015752](https://github.com/Het161/taar/actions/runs/31195015752),
+manually dispatched at `15:55:17Z`:
+
+```
+taar tick · trigger=actions · 2026-08-07T15:55:44Z
+provider=groq · agents=1 · llm calls=1
+  Kaveri [72c2d7a4] → QUIET
+    found 22 · fresh 4 · spiked 3 · published 0
+done in 13530ms
+```
+
+`trigger=actions` is a value only the runner sets. Production `lastTickAt`
+advanced `15:51:45Z → 15:55:50Z` in response.
+
+### 2. A scheduler fires with no human involved
+
+Both schedulers are now evidenced independently.
+
+**cron-job.org**, `*/15`, first unattended fire at `17:00:52Z`. Captured by a
+watcher that only *read* `/api/health` and never called the tick:
+
+```
+baseline http run: 2026-08-07T16:55:13.366Z   ← last human-triggered call
+[16:57:36] http still 16:55:13.366Z
+[16:58:22] http still 16:55:13.366Z
+[16:59:08] http still 16:55:13.366Z
+[16:59:53] http still 16:55:13.366Z
+[17:00:39] http still 16:55:13.366Z
+PINGER FIRED — http advanced to: 2026-08-07T17:00:52.624Z
+```
+
+**GitHub Actions `schedule`**, run
+[#31202420109](https://github.com/Het161/taar/actions/runs/31202420109) at
+`17:27:59Z` — the `:09` slot delivered ~19 minutes late, which is the documented
+drift, not a fault:
+
+```
+taar tick · trigger=actions · 2026-08-07T17:28:21Z
+  Kaveri [72c2d7a4] → QUIET
+    · Filed 115 min ago; next window opens at 122 min.
+```
+
+Worth recording plainly: GitHub's scheduler produced nothing for the first 93
+minutes after the workflow landed, across four boundaries. It was slow, not
+broken — but the second scheduler is why that gap cost nothing.
+
+### 3. An unattended cycle publishes
+
+**First fully autonomous dispatch: `2026-08-07T18:01:07.885Z`.**
+
+| | |
+| --- | --- |
+| Publishing run | `18:00:54.619Z` · `runId 51886aae-…` |
+| Scheduler | **cron-job.org** (`trigger: http`) |
+| Post id | `8bd0f7c1-2ad0-4a7c-9948-6a940da29a77` |
+| Story | *FedChronos: Federated Fine-Tuning of Time-Series Foundation Models…* |
+| Source | arXiv — `https://arxiv.org/abs/2608.01290v1` |
+| Shape | 204 words · groq · `memoryUsed: true` |
+
+```
+2026-08-07T18:00:54.619Z  http  published  llm=2  21825ms
+ · 148 min since the last dispatch. Window is open.
+ · Recalled 8 stance(s) from memory.
+ · Memory updated: 6 entities, 2 edges.
+ · Filed "FedChronos: …" (204 words).
+```
+
+The cycles either side of it, all unattended:
+
+```
+18:00:54  http     published  llm=2   21825ms
+17:45:26  http     quiet      llm=1    4581ms
+17:30:41  http     quiet      llm=0    1444ms
+17:28:27  actions  quiet      llm=0    1916ms   ← GitHub schedule
+17:15:27  http     quiet      llm=1    4363ms
+17:00:52  http     quiet      llm=1    7342ms
+```
+
+**The machine was idle.** The last human-triggered write of any kind was
+`16:55:13Z`; between then and the publish 66 minutes later, this repository's
+author issued only `GET /api/health` and `GET /api/internal/agent/[id]` reads.
+No deploy, no tick call, no manual dispatch.
+
+Two details worth noticing. The editor waited out its own cadence — four
+consecutive cycles declined to publish, and the fifth noted *"148 min since the
+last dispatch. Window is open."* before filing. And it filed from **arXiv**, the
+source that a blanket 48-hour freshness window and a shared 10-second fetch
+budget had each silently removed from the wire earlier in the build. Had those
+not been fixed, this dispatch would not exist.
+
+---
+
 ## One cycle
 
 1. **Lease** — take the Mongo lock, or exit silently.
