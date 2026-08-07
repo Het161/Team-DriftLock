@@ -1,0 +1,433 @@
+/**
+ * Story discovery across four free sources.
+ *
+ * Design rules:
+ *  - A dead adapter is skipped, never fatal. Three of four still makes a wire.
+ *  - Every adapter has its own 10s budget, so one slow host cannot eat the tick.
+ *  - Keywords rotate by clock slot, so consecutive ticks look at different parts
+ *    of the charter's sourcePlan. Without this the agent re-reads the same three
+ *    queries forever and the feed narrows to one corner of its own beat.
+ *
+ * Two things here were decided by probing the real APIs, not by assumption:
+ *
+ * 1. Freshness is per-source. A blanket 48-hour window silently deleted arXiv
+ *    from the wire entirely — for a niche query the newest matching preprint is
+ *    routinely four or five days old. That is not staleness, it is how preprints
+ *    move, so arXiv gets a wider window. News keeps 48 hours, where five days
+ *    genuinely is stale.
+ *
+ * 2. Bing News exists here because Google News RSS emits opaque
+ *    news.google.com/rss/articles/CBMi… links that only resolve via in-page
+ *    JavaScript. They work for a human, but they are poor things to publish in a
+ *    dispatch's `sources`. Bing wraps the real publisher URL in a query
+ *    parameter we can simply unwrap, so it yields clean, direct links. Google
+ *    News is kept for coverage; Bing is kept for link quality.
+ */
+
+export type SourceKey = "hackernews" | "arxiv" | "googlenews" | "bingnews";
+
+export type Candidate = {
+  title: string;
+  url: string;
+  source: SourceKey;
+  /** Human label — publisher name for news, "Hacker News" / "arXiv" otherwise. */
+  sourceLabel: string;
+  publishedAt: string;
+  snippet: string;
+  /** Corroborating signal, e.g. "412 points · 233 comments". Newsroom UI only. */
+  signal: string | null;
+  /** Which sourcePlan query surfaced this. Useful when explaining a decision. */
+  keyword: string;
+};
+
+export type AdapterStatus = {
+  source: SourceKey;
+  ok: boolean;
+  found: number;
+  ms: number;
+  error: string | null;
+};
+
+export type DiscoveryReport = {
+  candidates: Candidate[];
+  adapters: AdapterStatus[];
+};
+
+const FETCH_TIMEOUT_MS = 10_000;
+
+/** See the note above: preprints and news age at completely different rates. */
+const MAX_AGE_HOURS: Record<SourceKey, number> = {
+  hackernews: 48,
+  googlenews: 48,
+  bingnews: 48,
+  arxiv: 14 * 24,
+};
+
+/** Lower wins a duplicate. Ordered by how good the link it yields is. */
+const DEDUPE_PRECEDENCE: Record<SourceKey, number> = {
+  hackernews: 0, // direct publisher link plus a discussion signal
+  arxiv: 1, // canonical abstract page
+  bingnews: 2, // unwrapped publisher link
+  googlenews: 3, // opaque redirect; kept only for coverage
+};
+
+const UA = "TAAR/1.0 (autonomous wire service; https://github.com/Het161/taar)";
+
+/* -------------------------------------------------------------------------- */
+/* Entry point                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export async function discover(sourcePlan: string[]): Promise<DiscoveryReport> {
+  const plan = sourcePlan.map((k) => k.trim()).filter(Boolean);
+  if (!plan.length) return { candidates: [], adapters: [] };
+
+  // Rotate which slice of the plan each adapter uses, keyed to the 30-minute
+  // schedule so successive ticks genuinely cover different ground.
+  const slot = Math.floor(Date.now() / (30 * 60_000));
+  const pick = (count: number, offset: number) =>
+    Array.from(
+      { length: Math.min(count, plan.length) },
+      (_, i) => plan[(slot + offset + i) % plan.length],
+    );
+
+  // The two news adapters deliberately run the SAME queries. Splitting the plan
+  // between them would halve each one's coverage and, worse, mean they never
+  // surface the same story — which is exactly when the dedupe precedence below
+  // does its job of keeping Bing's clean publisher link over Google's redirect.
+  const newsKeywords = pick(2, 2);
+
+  const settled = await Promise.all([
+    run("hackernews", () => fromHackerNews(pick(3, 0))),
+    run("arxiv", () => fromArxiv(pick(2, 1))),
+    run("googlenews", () => fromGoogleNews(newsKeywords)),
+    run("bingnews", () => fromBingNews(newsKeywords)),
+  ]);
+
+  const now = Date.now();
+  const seenUrl = new Set<string>();
+  const seenTitle = new Set<string>();
+  const candidates: Candidate[] = [];
+
+  // Dedupe precedence, not fetch order. The same story routinely appears on
+  // both news adapters, and whichever is seen first keeps its URL — so Bing
+  // must win over Google News or its clean publisher links are always the ones
+  // discarded, which would make adding it pointless.
+  const byPreference = [...settled].sort(
+    (a, b) => DEDUPE_PRECEDENCE[a.status.source] - DEDUPE_PRECEDENCE[b.status.source],
+  );
+
+  for (const { candidates: batch } of byPreference) {
+    for (const c of batch) {
+      if (!c.url || !c.title) continue;
+
+      const age = now - new Date(c.publishedAt).getTime();
+      if (!Number.isFinite(age) || age > MAX_AGE_HOURS[c.source] * 3_600_000) continue;
+
+      const urlKey = normaliseUrl(c.url);
+      const titleKey = normaliseTitle(c.title);
+      if (seenUrl.has(urlKey) || seenTitle.has(titleKey)) continue;
+
+      seenUrl.add(urlKey);
+      seenTitle.add(titleKey);
+      candidates.push(c);
+    }
+  }
+
+  // Freshest first — the editorial gate reads only the top slice.
+  candidates.sort(
+    (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+  );
+
+  return { candidates, adapters: settled.map((s) => s.status) };
+}
+
+async function run(
+  source: SourceKey,
+  fn: () => Promise<Candidate[]>,
+): Promise<{ status: AdapterStatus; candidates: Candidate[] }> {
+  const started = Date.now();
+  try {
+    const candidates = await fn();
+    return {
+      candidates,
+      status: { source, ok: true, found: candidates.length, ms: Date.now() - started, error: null },
+    };
+  } catch (err) {
+    return {
+      candidates: [],
+      status: {
+        source,
+        ok: false,
+        found: 0,
+        ms: Date.now() - started,
+        error: err instanceof Error ? err.message : String(err),
+      },
+    };
+  }
+}
+
+async function get(url: string): Promise<Response> {
+  const res = await fetch(url, {
+    headers: { "user-agent": UA, accept: "*/*" },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${new URL(url).host}`);
+  return res;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Hacker News (Algolia)                                                       */
+/* -------------------------------------------------------------------------- */
+
+type HnHit = {
+  objectID: string;
+  title: string | null;
+  url: string | null;
+  story_text: string | null;
+  created_at: string;
+  points: number | null;
+  num_comments: number | null;
+};
+
+async function fromHackerNews(keywords: string[]): Promise<Candidate[]> {
+  const since = Math.floor((Date.now() - MAX_AGE_HOURS.hackernews * 3_600_000) / 1000);
+
+  const batches = await Promise.all(
+    keywords.map(async (keyword) => {
+      const url =
+        `https://hn.algolia.com/api/v1/search_by_date?query=${encodeURIComponent(keyword)}` +
+        `&tags=story&hitsPerPage=8&numericFilters=created_at_i>${since}`;
+      const body = (await get(url).then((r) => r.json())) as { hits?: HnHit[] };
+
+      return (body.hits ?? [])
+        .filter((h) => h.title)
+        .map<Candidate>((h) => ({
+          title: clean(h.title!),
+          // Ask HN and similar carry no external link; the discussion is the story.
+          url: h.url ?? `https://news.ycombinator.com/item?id=${h.objectID}`,
+          source: "hackernews",
+          sourceLabel: "Hacker News",
+          publishedAt: new Date(h.created_at).toISOString(),
+          snippet: clean(h.story_text ?? "").slice(0, 400),
+          signal:
+            h.points != null ? `${h.points} points · ${h.num_comments ?? 0} comments` : null,
+          keyword,
+        }));
+    }),
+  );
+
+  return batches.flat();
+}
+
+/* -------------------------------------------------------------------------- */
+/* arXiv (Atom)                                                                */
+/* -------------------------------------------------------------------------- */
+
+async function fromArxiv(keywords: string[]): Promise<Candidate[]> {
+  const batches = await Promise.all(
+    keywords.map(async (keyword) => {
+      const url =
+        `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(`"${keyword}"`)}` +
+        `&sortBy=submittedDate&sortOrder=descending&max_results=8`;
+      const xml = await get(url).then((r) => r.text());
+
+      return blocks(xml, "entry").map<Candidate>((entry) => {
+        // A revised preprint is news on its revision date, not its original one.
+        const published = tag(entry, "published") ?? "";
+        const updated = tag(entry, "updated") ?? "";
+        const newest = [published, updated]
+          .filter(Boolean)
+          .map((d) => new Date(d).getTime())
+          .filter((t) => Number.isFinite(t))
+          .sort((a, b) => b - a)[0];
+
+        return {
+          title: clean(tag(entry, "title") ?? ""),
+          url: clean(tag(entry, "id") ?? "").replace(/^http:/, "https:"),
+          source: "arxiv",
+          sourceLabel: "arXiv",
+          publishedAt: new Date(newest ?? 0).toISOString(),
+          snippet: clean(tag(entry, "summary") ?? "").slice(0, 400),
+          signal: "preprint",
+          keyword,
+        };
+      });
+    }),
+  );
+
+  return batches.flat();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Google News (RSS)                                                           */
+/* -------------------------------------------------------------------------- */
+
+async function fromGoogleNews(keywords: string[]): Promise<Candidate[]> {
+  const batches = await Promise.all(
+    keywords.map(async (keyword) => {
+      const url =
+        `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}` +
+        `&hl=en-US&gl=US&ceid=US:en`;
+      const xml = await get(url).then((r) => r.text());
+
+      return blocks(xml, "item")
+        .slice(0, 8)
+        .map<Candidate>((item) => {
+          const pubDate = tag(item, "pubDate") ?? "";
+          // <source> carries the actual publisher, which matters far more to a
+          // reader than "Google News" does.
+          const publisher = clean(tag(item, "source") ?? "Google News");
+          return {
+            title: stripPublisherSuffix(clean(tag(item, "title") ?? ""), publisher),
+            url: clean(tag(item, "link") ?? ""),
+            source: "googlenews",
+            sourceLabel: publisher,
+            publishedAt: pubDate ? new Date(pubDate).toISOString() : new Date(0).toISOString(),
+            snippet: textOf(tag(item, "description") ?? "").slice(0, 400),
+            signal: null,
+            keyword,
+          };
+        });
+    }),
+  );
+
+  return batches.flat();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Bing News (RSS)                                                             */
+/* -------------------------------------------------------------------------- */
+
+async function fromBingNews(keywords: string[]): Promise<Candidate[]> {
+  const batches = await Promise.all(
+    keywords.map(async (keyword) => {
+      const url = `https://www.bing.com/news/search?q=${encodeURIComponent(keyword)}&format=RSS`;
+      const xml = await get(url).then((r) => r.text());
+
+      return blocks(xml, "item")
+        .slice(0, 8)
+        .map<Candidate>((item) => {
+          const pubDate = tag(item, "pubDate") ?? "";
+          const link = unwrapBingLink(clean(tag(item, "link") ?? ""));
+          return {
+            title: clean(tag(item, "title") ?? ""),
+            url: link,
+            source: "bingnews",
+            sourceLabel: publisherFromUrl(link) ?? "Bing News",
+            publishedAt: pubDate ? new Date(pubDate).toISOString() : new Date(0).toISOString(),
+            snippet: textOf(tag(item, "description") ?? "").slice(0, 400),
+            signal: null,
+            keyword,
+          };
+        });
+    }),
+  );
+
+  return batches.flat();
+}
+
+/**
+ * Bing links look like
+ *   bing.com/news/apiclick.aspx?…&url=https%3a%2f%2fpublisher.com%2fstory&…
+ * The real destination is sitting in the `url` parameter, so the clean link is
+ * a decode away rather than a redirect chase.
+ */
+function unwrapBingLink(link: string): string {
+  try {
+    const inner = new URL(link).searchParams.get("url");
+    if (inner && /^https?:\/\//i.test(inner)) return inner;
+  } catch {
+    /* fall through to the original */
+  }
+  return link;
+}
+
+function publisherFromUrl(url: string): string | null {
+  try {
+    return new URL(url).host.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Parsing helpers                                                             */
+/* -------------------------------------------------------------------------- */
+
+/** All inner contents of <name …>…</name>. */
+function blocks(xml: string, name: string): string[] {
+  const re = new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, "gi");
+  return [...xml.matchAll(re)].map((m) => m[1]);
+}
+
+/** First inner content of <name …>…</name> within a block. */
+function tag(block: string, name: string): string | null {
+  const re = new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, "i");
+  return re.exec(block)?.[1] ?? null;
+}
+
+function clean(s: string): string {
+  return decodeEntities(s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1"))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Plain text from an RSS description.
+ *
+ * Order matters and was originally wrong here: RSS descriptions arrive with
+ * their markup entity-encoded (`&lt;a href=…&gt;`), so stripping tags before
+ * decoding finds no tags at all and the raw anchor markup ends up in the
+ * snippet. Decode first, then strip.
+ */
+function textOf(s: string): string {
+  return clean(stripTags(clean(s)));
+}
+
+function stripTags(s: string): string {
+  return s.replace(/<[^>]+>/g, " ");
+}
+
+/** Google News appends " - Publisher" to every headline. */
+function stripPublisherSuffix(title: string, publisher: string): string {
+  if (!publisher) return title;
+  const suffix = ` - ${publisher}`;
+  return title.endsWith(suffix) ? title.slice(0, -suffix.length).trim() : title;
+}
+
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    // Ampersand last, or it re-decodes the entities produced above.
+    .replace(/&amp;/g, "&");
+}
+
+export function normaliseUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.hash = "";
+    // Campaign parameters make the same story look like several stories.
+    for (const key of [...u.searchParams.keys()]) {
+      if (/^utm_|^ref$|^source$|^oc$/i.test(key)) u.searchParams.delete(key);
+    }
+    return `${u.host.replace(/^www\./, "")}${u.pathname.replace(/\/$/, "")}${u.search}`.toLowerCase();
+  } catch {
+    return url.trim().toLowerCase();
+  }
+}
+
+export function normaliseTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 90);
+}

@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { agents, ensureIndexes, type AgentDoc } from "@/lib/schema";
+import { agents, ensureIndexes, type AgentDoc, type Charter } from "@/lib/schema";
+import { buildCharter } from "@/lib/charter";
+import { remember } from "@/lib/breeth";
 import { ok, fail } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -62,13 +64,30 @@ export async function POST(req: Request) {
   const now = new Date().toISOString();
   const agentId = randomUUID();
 
+  // The charter is the persona-agnostic core: one LLM call turns {name, domain}
+  // into the standing editorial identity every later decision reads from.
+  //
+  // It is attempted here but never required. If the model is slow or down, the
+  // agent is created with charterStatus "pending" and the first tick builds it
+  // instead. Init returning 500 because a model hiccuped would fail the
+  // evaluation before it started, which is a far worse outcome than a charter
+  // that arrives thirty minutes late.
+  let charter: Charter | null = null;
+  let charterStatus: AgentDoc["charterStatus"] = "pending";
+
+  try {
+    const built = await withTimeout(buildCharter(persona), CHARTER_TIMEOUT_MS);
+    charter = built.charter;
+    charterStatus = "ready";
+  } catch {
+    charterStatus = "pending";
+  }
+
   const doc: AgentDoc = {
     agentId,
     persona,
-    // The Editorial Charter is generated from the persona in a later phase.
-    // Until then every agent starts pending and the first tick builds it.
-    charter: null,
-    charterStatus: "pending",
+    charter,
+    charterStatus,
     status: "active",
     createdAt: now,
     updatedAt: now,
@@ -87,8 +106,38 @@ export async function POST(req: Request) {
     );
   }
 
+  // Memory is seeded with the charter so the very first editorial decision has
+  // something to recall. Failing open: remember() never throws.
+  if (charter) {
+    await remember(agentId, persona.name, [
+      `covers ${persona.domain} for the TAAR wire.`,
+      `works these beats: ${charter.beats.join(", ")}.`,
+      ...charter.opinions.map((o) => `holds this position: ${o}`),
+    ]);
+  }
+
   // Exactly this shape. Nothing else.
   return ok({ agentId });
+}
+
+/**
+ * 12 seconds, not the 8 originally specified.
+ *
+ * Init is called once and awaited, never polled, so a few extra seconds cost
+ * the evaluator nothing — while the difference between a charter that lands
+ * here and one that lands on the first tick is whether the agent can file a
+ * dispatch immediately or has to spend its first cycle writing its own brief.
+ * Still far enough inside maxDuration=60 to be safe.
+ */
+const CHARTER_TIMEOUT_MS = 12_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms),
+    ),
+  ]);
 }
 
 export async function OPTIONS() {

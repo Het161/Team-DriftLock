@@ -46,6 +46,22 @@ export async function getDb(): Promise<Db> {
   return client.db(DB_NAME);
 }
 
+/**
+ * Closes the shared client. Only for one-shot scripts — a serverless route
+ * calling this would tear down the connection its next invocation expects to
+ * reuse. `scripts/tick.ts` needs it or the process never exits.
+ */
+export async function closeDb(): Promise<void> {
+  const pending = globalThis.__taarMongo;
+  if (!pending) return;
+  globalThis.__taarMongo = undefined;
+  try {
+    await (await pending).close();
+  } catch {
+    /* already gone */
+  }
+}
+
 /** Cheap liveness probe. Returns round-trip latency, or throws. */
 export async function pingDb(): Promise<number> {
   const started = Date.now();
