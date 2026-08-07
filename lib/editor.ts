@@ -96,6 +96,12 @@ export async function judge(input: {
         `    source: ${c.sourceLabel} (${c.source})${c.signal ? ` · ${c.signal}` : ""}`,
         `    published: ${c.publishedAt}`,
         `    found via: "${c.keyword}"`,
+        // Wide pickup cuts both ways and the editor is told so explicitly:
+        // it can mean the story matters, or that it is a commodity
+        // announcement every outlet reprinted from the same release.
+        c.corroboration > 1
+          ? `    also carried by ${c.corroboration - 1} other outlet(s): ${c.alsoReported.slice(1).join(", ")}`
+          : "    carried by this outlet only",
         c.snippet ? `    excerpt: ${c.snippet.slice(0, 260)}` : "    excerpt: (none)",
       ].join("\n"),
     ),

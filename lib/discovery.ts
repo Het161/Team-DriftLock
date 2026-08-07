@@ -38,6 +38,10 @@ export type Candidate = {
   signal: string | null;
   /** Which sourcePlan query surfaced this. Useful when explaining a decision. */
   keyword: string;
+  /** How many outlets carried this same story, including this one. */
+  corroboration: number;
+  /** The other outlets that carried it. */
+  alsoReported: string[];
 };
 
 export type AdapterStatus = {
@@ -133,12 +137,77 @@ export async function discover(sourcePlan: string[]): Promise<DiscoveryReport> {
     }
   }
 
-  // Freshest first — the editorial gate reads only the top slice.
-  candidates.sort(
+  // Collapse the same event reported under different headlines, then show the
+  // freshest first — the editorial gate reads only the top slice.
+  const clustered = cluster(candidates);
+  clustered.sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
   );
 
-  return { candidates, adapters: settled.map((s) => s.status) };
+  return { candidates: clustered, adapters: settled.map((s) => s.status) };
+}
+
+/**
+ * Merges near-duplicate stories.
+ *
+ * Exact URL and title matching is not enough. A single announcement reaches the
+ * wire as "AMD announces agreement with AI chip startup Taalas", "AMD acquires
+ * Taalas AI inference chip startup", and four other rewrites — on the first
+ * live run that filled five of the eight desk slots with one event, so the
+ * editor spent most of its judgement writing six variations of "this is a press
+ * release".
+ *
+ * Titles are compared by word overlap, and the first member of a cluster wins
+ * because candidates arrive in link-quality order. The count is kept rather
+ * than discarded: how many outlets carried something is genuine editorial
+ * signal, cutting both ways — wide pickup means the story matters, or that it
+ * is a commodity announcement everyone reprinted. The editor gets the number
+ * and decides which.
+ */
+function cluster(candidates: Candidate[]): Candidate[] {
+  const kept: Array<{ candidate: Candidate; tokens: Set<string> }> = [];
+
+  for (const c of candidates) {
+    const tokens = titleTokens(c.title);
+    const match = kept.find((k) => jaccard(k.tokens, tokens) >= 0.45);
+
+    if (match) {
+      match.candidate.corroboration++;
+      if (!match.candidate.alsoReported.includes(c.sourceLabel)) {
+        match.candidate.alsoReported.push(c.sourceLabel);
+      }
+      continue;
+    }
+
+    kept.push({
+      candidate: { ...c, corroboration: 1, alsoReported: [c.sourceLabel] },
+      tokens,
+    });
+  }
+
+  return kept.map((k) => k.candidate);
+}
+
+const STOPWORDS = new Set([
+  "the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "for", "with",
+  "as", "at", "by", "from", "is", "are", "was", "were", "be", "been", "it",
+  "its", "this", "that", "these", "those", "will", "can", "could", "would",
+  "has", "have", "had", "how", "why", "what", "new", "says", "said",
+]);
+
+function titleTokens(title: string): Set<string> {
+  return new Set(
+    normaliseTitle(title)
+      .split(" ")
+      .filter((w) => w.length > 2 && !STOPWORDS.has(w)),
+  );
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (!a.size || !b.size) return 0;
+  let shared = 0;
+  for (const t of a) if (b.has(t)) shared++;
+  return shared / (a.size + b.size - shared);
 }
 
 async function run(
@@ -213,6 +282,8 @@ async function fromHackerNews(keywords: string[]): Promise<Candidate[]> {
           signal:
             h.points != null ? `${h.points} points · ${h.num_comments ?? 0} comments` : null,
           keyword,
+          corroboration: 1,
+          alsoReported: [],
         }));
     }),
   );
@@ -251,6 +322,8 @@ async function fromArxiv(keywords: string[]): Promise<Candidate[]> {
           snippet: clean(tag(entry, "summary") ?? "").slice(0, 400),
           signal: "preprint",
           keyword,
+          corroboration: 1,
+          alsoReported: [],
         };
       });
     }),
@@ -287,6 +360,8 @@ async function fromGoogleNews(keywords: string[]): Promise<Candidate[]> {
             snippet: textOf(tag(item, "description") ?? "").slice(0, 400),
             signal: null,
             keyword,
+            corroboration: 1,
+            alsoReported: [],
           };
         });
     }),
@@ -319,6 +394,8 @@ async function fromBingNews(keywords: string[]): Promise<Candidate[]> {
             snippet: textOf(tag(item, "description") ?? "").slice(0, 400),
             signal: null,
             keyword,
+            corroboration: 1,
+            alsoReported: [],
           };
         });
     }),

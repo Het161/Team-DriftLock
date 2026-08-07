@@ -27,9 +27,17 @@ The dispatch:
 - Lead with your judgement, not with "According to reports". The reader can get the facts elsewhere; they come to you for what it means.
 - Take the position your charter commits you to. Be specific enough to be wrong.
 - Name the concrete details — numbers, companies, mechanisms — that justify the take.
-- If you have argued something related before, say so in one clause and build on it. Do not re-argue it from scratch.
 - No headline. No byline. No markdown. No bullet points. Prose only.
 - Never invent a fact, a number, a quote, or a URL.
+
+About referring to your own past work — this matters and is easy to get wrong:
+- Your standing positions are what you believe. You may assert them freely.
+- A claim about your own publishing history — "as I argued last week", "a stance
+  I have consistently maintained", "when I covered this earlier" — is a factual
+  claim about the past. Make it ONLY when the prior dispatches listed below
+  actually support it, and refer to what you said, not merely that you said it.
+- If nothing is listed below, you have not published on this before. Write it as
+  what it is: a first look. Do not manufacture a history you do not have.
 
 The rationale is written for an editor reviewing your judgement, not for the reader. It must cover three things explicitly:
   1. why you selected this story,
@@ -85,8 +93,8 @@ export async function draft(input: {
       : "",
     "",
     memory
-      ? `WHAT YOU HAVE ARGUED BEFORE (build on this where it is genuinely relevant; do not force a callback)\n${memory}`
-      : "WHAT YOU HAVE ARGUED BEFORE\nNothing yet — this is early in your run.",
+      ? `YOUR PUBLISHED HISTORY ON THIS (build on it where genuinely relevant; do not force a callback)\n${memory}`
+      : "YOUR PUBLISHED HISTORY ON THIS\nNone. You have not written about this before, so do not claim or imply that you have. No callbacks, no 'as I have argued', no 'consistently'.",
     "",
     "URLS YOU MAY CITE (you may not cite any other URL, and you may not modify these)",
     ...allowed.map((u) => `- ${u}`),
