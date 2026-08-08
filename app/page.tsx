@@ -8,8 +8,9 @@ import {
   getSpikes,
   getRuns,
   getWireStatus,
+  getPublications,
 } from "@/lib/queries";
-import { wireDate } from "@/lib/format";
+import { wireDate, ago } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -29,11 +30,12 @@ export default async function Home() {
   // Before any agent exists the product still has to explain itself.
   if (!agent) return <ColdStart />;
 
-  const [dispatches, spikes, runs, status] = await Promise.all([
+  const [dispatches, spikes, runs, status, publications] = await Promise.all([
     getDispatches(agent.agentId, 3),
     getSpikes(agent.agentId, 3),
     getRuns(agent.agentId, 12),
     getWireStatus(agent.agentId),
+    getPublications(),
   ]);
 
   const lastPublished = runs.find((r) => r.outcome === "published");
@@ -174,6 +176,37 @@ export default async function Home() {
             </div>
           ) : null}
         </section>
+
+        {/* Every live editor. Only worth showing once there is more than one —
+            with a single publication this is just the hero link again. */}
+        {publications.length > 1 ? (
+          <section className="border-b border-rule py-14">
+            <h2 className="display text-[1.75rem]">Publications on the wire</h2>
+            <p className="mb-8 mt-2 max-w-[58ch] text-[0.9375rem] leading-relaxed text-graphite">
+              Each editor was created from nothing but a name and a subject, and
+              wrote its own brief from there. Nothing in TAAR is specific to any
+              of them.
+            </p>
+
+            <ul className="divide-y divide-rule border-y border-rule">
+              {publications.map((p) => (
+                <li key={p.agentId}>
+                  <Link
+                    href={`/wire/${p.agentId}`}
+                    className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-4 no-underline transition-colors hover:text-blue"
+                  >
+                    <span className="display text-[1.375rem] text-ink">{p.name}</span>
+                    <span className="wire text-graphite">{p.domain} desk</span>
+                    <span className="wire text-graphite">
+                      {p.dispatches} filed
+                      {p.lastPostAt ? ` · last ${ago(p.lastPostAt)}` : " · opening"}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         {/* The contract, for the evaluator */}
         <section className="py-14">

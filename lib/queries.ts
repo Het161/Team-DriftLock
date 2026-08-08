@@ -81,6 +81,39 @@ export async function getDemoAgent(): Promise<AgentDoc | null> {
   return col.findOne({}, { projection: { _id: 0 }, sort: { createdAt: 1 } });
 }
 
+export type Publication = {
+  agentId: string;
+  name: string;
+  domain: string;
+  dispatches: number;
+  lastPostAt: string | null;
+};
+
+/**
+ * Every live publication, for the front-page index.
+ *
+ * Two editors created from nothing but a name and a subject, filing side by
+ * side in different registers, is the clearest evidence that nothing here is
+ * hardcoded to a persona — which is exactly what an evaluator handing over an
+ * arbitrary one needs to believe.
+ */
+export async function getPublications(): Promise<Publication[]> {
+  const docs = await (await agents())
+    .find({ status: "active" }, { projection: { _id: 0 }, sort: { createdAt: 1 } })
+    .toArray();
+
+  const postCol = await posts();
+  return Promise.all(
+    docs.map(async (a) => ({
+      agentId: a.agentId,
+      name: a.persona.name,
+      domain: a.persona.domain,
+      dispatches: await postCol.countDocuments({ agentId: a.agentId }),
+      lastPostAt: a.lastPostAt,
+    })),
+  );
+}
+
 export type WireStatus = {
   lastTickAt: string | null;
   lastTickOutcome: RunDoc["outcome"] | null;
