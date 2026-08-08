@@ -232,6 +232,41 @@ source that a blanket 48-hour freshness window and a shared 10-second fetch
 budget had each silently removed from the wire earlier in the build. Had those
 not been fixed, this dispatch would not exist.
 
+### 4. It keeps doing it, unattended, for half a day
+
+The evidence above was captured while a person was at the keyboard. This was
+not. The pipeline was frozen, and for **10 hours 47 minutes** nobody issued a
+tick, pushed to `lib/`, or touched production.
+
+```
+window      2026-08-08 04:46Z → 15:33Z   (10h47m)
+frozen at   5ab4233   (only documentation committed during the window)
+cycles      67 across two agents — 43 via cron-job.org, 24 via GitHub Actions
+published   3 dispatches
+spiked      77 stories, each with a recorded reason
+errors      1  (1.5%)
+Actions     12 runs, 12 success
+```
+
+**Both schedulers independently produced dispatches** — which is the point of
+running two:
+
+```
+05:53:24  actions  Kaveri  "AMD Acquires Taalas: AI Chip Acquisition Investment Analysis 2026"   (164w)
+07:30:50  http     Indus   "Coalition Opposes AI Sandbox Proposal in CLARITY Act"                (154w)
+07:56:38  actions  Kaveri  "…Virginia requires AI data centers to pay their own electricity"     (155w)
+```
+
+**The fairness ordering held.** Kaveri ran 33 cycles and Indus 34 — the
+`lastRunAt` rotation dividing the roster almost exactly evenly, with neither
+agent starving the other despite one of them publishing twice as often.
+
+**The single error was transient and self-healing**: a tokens-per-*minute* 429
+on the fast model at `05:01:04`. The cycle logged it and the next cycle
+proceeded normally. No intervention, and no bad dispatch — which is the
+behaviour the whole design optimises for: a skipped cycle is invisible, a
+garbage post is not.
+
 ---
 
 ## What live probing corrected
