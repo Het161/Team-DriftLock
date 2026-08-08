@@ -68,69 +68,277 @@ whatever the driver returns. Schema drift cannot leak a sixth key.
 
 ---
 
-## How autonomy works
+## Architecture
 
 The deployment serves the feed. **It is not what fills it.**
 
+### The four planes
+
+```
+╔═══════════════════════════════════════════════════════════════════════════╗
+║  ① TRIGGER PLANE                          two schedulers, always both     ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║   GitHub Actions                          cron-job.org                    ║
+║   cron 9,39 * * * *                       */30, offset from Actions       ║
+║   runs on GitHub's runner                 calls Vercel over HTTP          ║
+╚════════════════╤══════════════════════════════════════╤═══════════════════╝
+                 │ npx tsx scripts/tick.ts              │ POST + bearer
+                 │ (Vercel NOT in this path)            │
+                 ▼                                      ▼
+╔═══════════════════════════════════════════════════════════════════════════╗
+║  ② EXECUTION PLANE                        lib/tick.ts — one cycle         ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║   lease ▸ roster ▸ charter ▸ cadence ▸ discover ▸ dedupe ▸ recall         ║
+║         ▸ judge ▸ spike ▸ draft ▸ persist ▸ remember ▸ log                ║
+║                                                                           ║
+║   caps   8 LLM calls/cycle · 3 agents/cycle · desk of 6 · 8-min lease     ║
+╚════════════════╤═════════════════════════╤═══════════════════╤════════════╝
+                 │                         │                   │
+                 ▼                         ▼                   ▼
+╔════════════════════════════╗ ╔═══════════════════╗ ╔══════════════════════╗
+║  ③ STATE PLANE             ║ ║  ③ MEMORY         ║ ║  ③ SOURCE PLANE      ║
+╠════════════════════════════╣ ╠═══════════════════╣ ╠══════════════════════╣
+║  MongoDB Atlas M0          ║ ║  Breeth           ║ ║  Hacker News (HN)    ║
+║   agents · posts           ║ ║  knowledge graph  ║ ║  arXiv               ║
+║   rejections · runs        ║ ║  scoped by        ║ ║  Google News RSS     ║
+║   locks (TTL)              ║ ║  group_id=agentId ║ ║  Bing News RSS       ║
+╚════════════════╤═══════════╝ ╚═══════════════════╝ ╚══════════════════════╝
+                 │ read-only projection
+                 ▼
+╔═══════════════════════════════════════════════════════════════════════════╗
+║  ④ SERVING PLANE                          Vercel Hobby — serves only      ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║   POST /api/agent/init      GET /api/agent/feed      POST /api/agent/tick ║
+║   /  ·  /wire/[id]  ·  /newsroom/[id]                                     ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+```
+
+**The two trigger paths are redundant at the execution layer, not just the
+schedule.** Actions runs the cycle on GitHub's own runner and talks straight to
+Mongo — Vercel is nowhere in that path. The pinger instead calls Vercel, which
+runs the same cycle there. A Vercel outage does not stop the wire, and neither
+does a GitHub one.
+
+### System view
+
 ```mermaid
 flowchart LR
-  subgraph SCHED["Two schedulers, running in parallel"]
-    GHA["GitHub Actions<br>cron 9,39 past the hour"]
+  subgraph TRIG["① Trigger — both, always"]
+    GHA["GitHub Actions<br>cron 9,39 hourly"]
     PING["cron-job.org<br>every 30 min, offset"]
   end
 
-  subgraph V["Vercel Hobby — serves, does not drive"]
-    API["POST /api/agent/init<br>GET /api/agent/feed<br>POST /api/agent/tick"]
+  subgraph EXEC["② Execution — lib/tick.ts"]
+    LOCK{{"Mongo lease<br>8 min TTL"}}
+    CYCLE["discover → judge → file"]
+  end
+
+  subgraph EXT["③ External"]
+    SRC["HN · arXiv<br>Google News · Bing News"]
+    LLM["Groq 8b — judge<br>Groq 70b — draft<br>Gemini — emergency"]
+    MEM["Breeth graph"]
+  end
+
+  DB[("MongoDB Atlas M0<br>agents · posts · rejections<br>runs · locks")]
+
+  subgraph SERVE["④ Serving — Vercel"]
+    API["/api/agent/init<br>/api/agent/feed<br>/api/agent/tick"]
     UI["front page · wire · newsroom"]
   end
 
-  TICK["the cycle — lib/tick.ts<br>discover → judge → file"]
-  DB[("MongoDB Atlas M0<br>agents · posts · rejections<br>runs · locks")]
-  LLM["Groq 8b — judging<br>Groq 70b — drafting<br>Gemini 2.5 Flash — emergency"]
-  MEM["Breeth<br>knowledge graph"]
-  SRC["Hacker News · arXiv<br>Google News · Bing News"]
-  EV(["Evaluator"])
+  EVAL(["Evaluator"])
 
-  GHA -->|runs scripts/tick.ts<br>on its own runner| TICK
-  PING -->|POST, bearer token| API
-  API -->|same cycle, in Vercel| TICK
+  GHA -->|own runner| LOCK
+  PING -->|bearer token| API
+  API -->|same cycle| LOCK
+  LOCK -->|acquired| CYCLE
+  LOCK -.->|held → exit silently| GHA
 
-  TICK -->|takes a lease first| DB
-  TICK --> SRC
-  TICK --> LLM
-  TICK <--> MEM
+  CYCLE --> SRC
+  CYCLE --> LLM
+  CYCLE <--> MEM
+  CYCLE --> DB
 
-  EV --> API
+  EVAL --> API
   API --> DB
   UI --> DB
 ```
 
+### One cycle, in sequence
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant S as Scheduler
+  participant T as lib/tick.ts
+  participant DB as Mongo
+  participant SRC as Sources
+  participant G as Groq 8b / 70b
+  participant B as Breeth
+
+  S->>T: run cycle
+  T->>DB: acquire lease (findOneAndUpdate, 8 min)
+  alt lease held by another run
+    DB-->>T: duplicate key
+    T-->>S: exit silently
+  end
+  T->>DB: roster — status active, ORDER BY lastRunAt ASC, LIMIT 3
+
+  loop per agent
+    opt charter missing or pending
+      T->>G: build charter (70b)
+      T->>DB: persist charter, mark ready
+    end
+    T->>DB: posts today + lastPostAt
+    Note over T: cadence gate — ≤3/day, ≥120 min apart, ±10 min jitter
+    T->>SRC: 4 adapters × rotating queries (sourcePlan ∪ beats)
+    opt fewer than 4 fresh
+      T->>SRC: widen — second pass, different slice
+    end
+    T->>DB: drop published + spiked (holds return after 3h)
+    T->>B: recall stances
+    T->>DB: prior dispatches (authority on what was published)
+    alt window closed AND judged within the hour
+      Note over T: skip the gate — save the budget
+    else
+      T->>G: judge whole desk in ONE call (8b)
+      T->>DB: persist every refusal with its reason
+    end
+    opt winner AND window open
+      T->>G: draft dispatch + rationale (70b)
+      Note over T: sources ∩ discovered URLs — a link cannot be invented
+      T->>DB: insert post, bump lastPostAt
+      T->>B: remember the stance as subject-verb prose
+    end
+    T->>DB: record run (outcome, tokens by tier, notes)
+  end
+  T->>DB: release lease
+```
+
+### A candidate's lifecycle
+
+The `hold` transition is the one that matters. Treating it as a permanent
+refusal is what silenced the wire for nine and a half hours.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Discovered: adapter returns it
+  Discovered --> Dropped: older than the per-source window
+  Discovered --> Merged: near-duplicate of another headline
+  Merged --> Discovered: canonical publisher promoted as representative
+  Discovered --> Seen: already published or spiked by this agent
+  Seen --> [*]
+  Discovered --> Desk: fresh, top 6 by recency
+
+  Desk --> Spiked: below the bar
+  Desk --> Held: real, but not yet
+  Desk --> Published: clears the bar and the window is open
+
+  Spiked --> [*]: permanent — never reconsidered
+  Held --> Desk: after 3h cooldown, eligible again
+  Published --> [*]: immutable, returned forever
+```
+
+### Failure is a ladder, not a cliff
+
+```mermaid
+flowchart TD
+  A["quality call<br>(charter / draft)"] --> B{"Groq 70b"}
+  B -->|ok| DONE([dispatch])
+  B -->|429 per-day → no retry| C{"Gemini 2.5 Flash"}
+  B -->|5xx / TPM| B2["retry once"] --> C
+  C -->|ok| DONE
+  C -->|20/day spent| D{"Groq 8b"}
+  D -->|ok| DONE2([dispatch, smaller model<br>recorded in the run log])
+  D -->|exhausted| E([skip the cycle — publish nothing])
+
+  style E fill:#F6F5F1,stroke:#C63B21,color:#1A1915
+  style DONE2 fill:#F6F5F1,stroke:#8A887F,color:#1A1915
+```
+
+A skipped cycle is invisible to a reader. A garbage dispatch is not — so every
+degradation step prefers publishing less over publishing worse, and the last
+step publishes nothing at all.
+
+### Data model
+
+```mermaid
+erDiagram
+  AGENTS ||--o{ POSTS : files
+  AGENTS ||--o{ REJECTIONS : refuses
+  AGENTS ||--o{ RUNS : "is processed by"
+  LOCKS ||--|| RUNS : "serialises"
+
+  AGENTS {
+    string agentId PK
+    object persona "name + domain — all the evaluator gives"
+    object charter "voice, beats, opinions, standards, sourcePlan, cadence"
+    string charterStatus "ready | pending | failed"
+    string lastPostAt "cadence gate reads this"
+    string lastRunAt "roster ORDERS BY this — fairness"
+    string lastJudgedAt "quiet-cycle budget economy"
+    object memorySnapshot "what recall returned last cycle"
+  }
+  POSTS {
+    string id PK "stable, returned forever"
+    string createdAt "ISO-8601 Z"
+    string text "the 5 contract fields"
+    string rationale "why selected, why now, what it beat"
+    array sources "∩ discovered URLs"
+    object candidate "internal — newsroom UI only"
+    string provider "which model wrote it"
+  }
+  REJECTIONS {
+    string id PK
+    string verdict "spike (permanent) | hold (3h cooldown)"
+    number score "0-100 against the charter"
+    string reason "shown publicly in The Spike"
+  }
+  RUNS {
+    string runId PK
+    string trigger "actions | http | manual"
+    string outcome "published | quiet | skipped | locked | error"
+    number tokens "all models"
+    number qualityTokens "70b only — the guarded bucket"
+  }
+  LOCKS {
+    string _id PK "single row, id=tick"
+    string holder "release only if still ours"
+    date expiresAt "TTL-reaped if a run dies"
+  }
+```
+
+Only the first five fields of `POSTS` ever leave through `/api/agent/feed`;
+[lib/contract.ts](lib/contract.ts) is the single exit point, projecting in the
+driver *and* rebuilding key-by-key in code.
+
+---
+
+## Why it is built this way
 
 **Why GitHub Actions.** Vercel Hobby's cron allows only once-a-day schedules, so
-it cannot drive a 30-minute cadence. A long-running server has no free tier
-worth trusting for 48 unattended hours. Actions gives unlimited minutes on a
-public repo, no serverless timeout, and a **public run history** that doubles as
-evidence nobody was driving.
+it cannot drive this cadence. A long-running server has no free tier worth
+trusting for days. Actions gives unlimited minutes on a public repo, no
+serverless timeout, and a **public run history** that doubles as evidence nobody
+was driving.
 
 **Why two triggers.** The likeliest way this project dies mid-evaluation is one
-free scheduler quietly stopping. `POST /api/agent/tick`, guarded by
-`CRON_SECRET`, lets any external pinger act as a second scheduler. Running both
-is safe because [lib/lock.ts](lib/lock.ts) takes a Mongo lease first —
-whichever arrives second exits without doing anything. This is tested, not
-assumed: two ticks fired simultaneously produced one publish and one
-`lease held by another run`.
+free scheduler quietly stopping — and GitHub's did go silent for 93 minutes
+across four boundaries on day one. Running both is safe because the Mongo lease
+makes overlap impossible: two ticks fired simultaneously produced one publish
+and one `lease held by another run`.
 
-Note what the arrows say: Actions runs the cycle **on its own runner**, talking
-straight to Mongo with Vercel nowhere in the path. The pinger instead calls
-Vercel, which runs the same cycle there. So the two lines are redundant at the
-*execution* layer too — a Vercel outage does not stop the wire, and a GitHub
-outage does not either.
+**Why the cadence is slower than the cycle.** A cycle runs roughly every 15–20
+minutes; the editor publishes 3 times a day. Most cycles are deliberately quiet
+— it still discovers and still spikes, it just does not file. A wire that
+published every cycle would exhaust the free budget before lunch and read like a
+scraper rather than a correspondent.
 
-**Why the cadence is slower than the cycle.** The two schedulers are offset, so
-a cycle runs roughly every 15–20 minutes; the editor publishes 3 times a day.
-Most cycles are deliberately quiet — it still discovers and still spikes, it
-just does not file. A wire that published every cycle would exhaust the free LLM
-budget before lunch and read like a scraper rather than a correspondent.
+**Why judging and drafting use different models.** Groq's limits are per-model.
+Judging is frequent and structured; drafting is rare and is the only part a
+reader sees. Sharing one model meant the cheap frequent task exhausted the
+budget for the expensive rare one, and the wire went dark with the quality model
+untouched.
 
 ---
 
@@ -301,36 +509,15 @@ candidate pool. Nothing had crashed. It was working exactly as written.
 
 ---
 
-## One cycle
-
-1. **Lease** — take the Mongo lock, or exit silently.
-2. **Charter** — if the agent has none, write it (one LLM call). See below.
-3. **Cadence** — decide whether the filing window is open. Jitter is derived
-   from the agent id, not random, so a retry can't publish early by luck.
-4. **Discover** — four adapters against the charter's own source plan, each with
-   its own fetch budget. A dead adapter is skipped, never fatal. Near-duplicate
-   rewrites of one announcement collapse into a single candidate. If the desk
-   comes back thin, one widening pass runs over a different slice of the plan.
-5. **Dedupe** — drop anything already published or already refused, by
-   normalised URL *and* normalised title.
-6. **Recall** — ask memory what this editor already believes about the desk.
-7. **Judge** — one comparative LLM call scores the whole desk and picks at most
-   one winner. Publishing nothing is a valid outcome.
-8. **Spike** — persist every refusal with its reason.
-9. **Write** — one LLM call drafts the dispatch, the rationale, and the sources.
-10. **Remember** — write an episode describing what was argued.
-11. **Log** — record the cycle in `runs`, quiet or not.
-
-Budget: at most 8 LLM calls per cycle, 2 in steady state (judge + write), 1 on a
-quiet cycle. The day's usage is read back out of `runs`, and the provider
-switches to the fallback before the Groq free tier is exhausted.
-
----
 
 ## Operating budget
 
 Everything runs on free tiers, so the budget is a design constraint rather than
 a footnote. These are measured numbers, not estimates.
+
+A cycle is capped at **8 LLM calls**, and costs 2 in steady state (judge +
+draft), 1 on a quiet cycle, and **0** whenever dedupe leaves nothing fresh —
+which is most of them.
 
 **What a call actually costs**
 
