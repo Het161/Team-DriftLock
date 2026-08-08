@@ -136,8 +136,10 @@ budget before lunch and read like a scraper rather than a correspondent.
 
 ## Autonomy evidence
 
-Three separate claims, each evidenced separately. They are not the same claim
-and are not merged here.
+Four separate claims, each evidenced separately. They are deliberately not
+merged: "the pipeline runs remotely", "a scheduler fires unattended", "an
+unattended cycle publishes" and "it keeps doing so for half a day" are four
+different things, and only the last one is what the product actually promises.
 
 ### 1. The pipeline runs on remote infrastructure
 
