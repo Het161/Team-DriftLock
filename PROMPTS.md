@@ -492,3 +492,78 @@ Two cycles watched after the change, per the standing rule on pipeline edits.
 next was correctly held by cadence two minutes later. The published dispatch's
 rationale names all three candidates it beat, by title — the honesty fix from
 005 working on its first real outing.
+
+---
+
+## 007 · The second agent, and four provider failures behind it
+
+**Date:** 2026-08-08
+**Tool:** Claude Code (Opus 5) in VS Code
+
+### Prompt
+
+> "i will not stay with laptop so keep going"
+
+Run the evaluator's first hour for real, then stand up the second publication.
+
+### Produced
+
+A second live editor — **Indus**, AI Policy and Regulation — created through the
+public API exactly as an evaluator would, and a front-page index of every
+publication. Init took **7.7s**, returned a ready charter, and the feed answered
+`{"posts":[]}` immediately.
+
+The two wires read like different people, which is the point:
+
+> **Kaveri** — "…bridging the programming model gaps for custom AI accelerators
+> … aligning with my conviction that innovations in software will drive the real
+> AI revolution."
+>
+> **Indus** — "…while much of the global policy discourse remains fixated on the
+> often-vague concept of 'AI ethics' … Gujarat is laying concrete tracks."
+
+### Corrected
+
+Standing up a second agent doubled the load and broke four things at once, each
+of which had looked fine.
+
+- **The Gemini fallback had never worked.** Pinned to `v1` on the strength of a
+  probe that sent neither a system instruction nor JSON mode — and `v1` rejects
+  both. Every real call uses both, so the fallback passed a test it could only
+  fail in production, and it failed the first time Groq ran out. `v1beta`
+  accepts both. **This is the second time a provider assumption survived until
+  precisely the moment it mattered**, and the lesson is the same one twice:
+  probe the call you are actually going to make.
+- **I reported the wrong budget last night.** Groq caps this model at 100,000
+  tokens per *day* and publishes that nowhere in the response headers — only in
+  the body of the 429. I read `x-ratelimit-remaining-requests: 998/1000` and
+  told the user there was 7× headroom while the account was at 96.7k tokens.
+  Usage is now read from every response, summed into the run log, and the
+  provider switches at 80k.
+- **The cheap frequent task was starving the expensive rare one.** Judging and
+  drafting shared the 70b, but judging runs many times an hour and drafting
+  three times a day. The gate moved to `llama-3.1-8b-instant` — its own daily
+  bucket, and the same six-verdict JSON in **465 tokens against ~2,000**.
+  Drafting stays on the 70b, where the difference is legible to a reader.
+  `gpt-oss-20b` was tried first and rejected: it cannot hold JSON mode.
+- **Retries were spending a scarce allowance to be told the same thing.**
+  Gemini's free tier here is **twenty requests a day**, and every failure burned
+  two of them. A per-day quota rejection is no longer retryable.
+- **Gemini truncated the gate's JSON mid-object.** 2.5 Flash spent 823 tokens
+  reasoning to produce 441 of answer. With `thinkingBudget: 0` the same prompt
+  costs 520 total and parses — 60% cheaper and structurally incapable of running
+  out mid-object.
+- **A never-published agent could never be in "drought".** The check keyed on
+  minutes since the last dispatch, which is null until there is one — so the
+  nudge skipped precisely the agent that most needs to publish: the evaluator's,
+  minutes after they created it. The idle clock now runs from creation when
+  nothing has been filed, with a 25-minute fuse rather than four hours.
+- **I broke the build mid-session** with a type error, caught before pushing
+  because `npm run build` is now the pre-push check rather than `tsc --noEmit`.
+
+### The policy this settled
+
+A quality-tier call that exhausts both the good model and the fallback now drops
+to the fast model rather than failing. On a free tier the honest choice is a
+dispatch written by a smaller model over a wire that goes dark, and the run log
+records which model wrote each one.
