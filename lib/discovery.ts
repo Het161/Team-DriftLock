@@ -4,9 +4,9 @@
  * Design rules:
  *  - A dead adapter is skipped, never fatal. Three of four still makes a wire.
  *  - Each adapter has its own fetch budget, so one slow host cannot eat the tick.
- *  - Keywords rotate by clock slot, so consecutive ticks look at different parts
- *    of the charter's sourcePlan. Without this the agent re-reads the same three
- *    queries forever and the feed narrows to one corner of its own beat.
+ *  - Queries rotate by clock slot, so consecutive ticks cover different ground.
+ *    Without this the agent re-reads the same handful of queries forever and the
+ *    feed narrows to one corner of its own beat.
  *
  * Two things here were decided by probing the real APIs, not by assumption:
  *
@@ -36,7 +36,7 @@ export type Candidate = {
   snippet: string;
   /** Corroborating signal, e.g. "412 points · 233 comments". Newsroom UI only. */
   signal: string | null;
-  /** Which sourcePlan query surfaced this. Useful when explaining a decision. */
+  /** Which query surfaced this. Useful when explaining a decision. */
   keyword: string;
   /** How many outlets carried this same story, including this one. */
   corroboration: number;
@@ -96,17 +96,20 @@ const UA = "TAAR/1.0 (autonomous wire service; https://github.com/Het161/taar)";
 /* -------------------------------------------------------------------------- */
 
 export async function discover(
-  sourcePlan: string[],
+  queries: string[],
   options: { offset?: number } = {},
 ): Promise<DiscoveryReport> {
-  const plan = sourcePlan.map((k) => k.trim()).filter(Boolean);
+  const plan = [...new Set(queries.map((k) => k.trim()).filter(Boolean))];
   if (!plan.length) return { candidates: [], adapters: [] };
 
-  // Rotate which slice of the plan each adapter uses, keyed to the 30-minute
-  // schedule so successive ticks genuinely cover different ground. `offset`
-  // lets the caller ask for a different slice — used to widen the search when a
-  // niche beat comes back near-empty.
-  const slot = Math.floor(Date.now() / (30 * 60_000)) + (options.offset ?? 0);
+  // Rotate which slice of the pool each adapter uses. `offset` lets the caller
+  // ask for a different slice — used to widen the search when a beat comes back
+  // near-empty.
+  //
+  // 15-minute granularity, matching the fastest scheduler. At 30 minutes two
+  // consecutive pinger cycles landed in the same slot and re-ran identical
+  // queries, so the rotation did nothing for half of all cycles.
+  const slot = Math.floor(Date.now() / (15 * 60_000)) + (options.offset ?? 0);
   const pick = (count: number, offset: number) =>
     Array.from(
       { length: Math.min(count, plan.length) },
@@ -289,7 +292,7 @@ async function fromHackerNews(keywords: string[]): Promise<Candidate[]> {
     keywords.map(async (keyword) => {
       const url =
         `https://hn.algolia.com/api/v1/search_by_date?query=${encodeURIComponent(keyword)}` +
-        `&tags=story&hitsPerPage=8&numericFilters=created_at_i>${since}`;
+        `&tags=story&hitsPerPage=20&numericFilters=created_at_i>${since}`;
       const body = (await get(url, "hackernews").then((r) => r.json())) as { hits?: HnHit[] };
 
       return (body.hits ?? [])
@@ -339,7 +342,7 @@ async function fromArxiv(keywords: string[]): Promise<Candidate[]> {
 async function arxivQuery(keyword: string): Promise<Candidate[]> {
   const url =
     `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(`"${keyword}"`)}` +
-    `&sortBy=submittedDate&sortOrder=descending&max_results=8`;
+    `&sortBy=submittedDate&sortOrder=descending&max_results=15`;
   const xml = await get(url, "arxiv").then((r) => r.text());
 
   return blocks(xml, "entry").map<Candidate>((entry) => {
@@ -384,7 +387,7 @@ async function fromGoogleNews(keywords: string[]): Promise<Candidate[]> {
       const xml = await get(url, "googlenews").then((r) => r.text());
 
       return blocks(xml, "item")
-        .slice(0, 8)
+        .slice(0, 12)
         .map<Candidate>((item) => {
           const pubDate = tag(item, "pubDate") ?? "";
           // <source> carries the actual publisher, which matters far more to a
@@ -420,7 +423,7 @@ async function fromBingNews(keywords: string[]): Promise<Candidate[]> {
       const xml = await get(url, "bingnews").then((r) => r.text());
 
       return blocks(xml, "item")
-        .slice(0, 8)
+        .slice(0, 12)
         .map<Candidate>((item) => {
           const pubDate = tag(item, "pubDate") ?? "";
           const link = unwrapBingLink(clean(tag(item, "link") ?? ""));

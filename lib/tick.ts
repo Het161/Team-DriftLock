@@ -39,6 +39,8 @@ const MAX_AGENTS_PER_TICK = 3;
 const DESK_SIZE = 8;
 /** Below this many fresh candidates, widen the search before giving up. */
 const MIN_DESK = 4;
+/** How long a held story stays off the desk before it may be reconsidered. */
+const HOLD_COOLDOWN_MS = 3 * 60 * 60 * 1000;
 
 export type AgentRunSummary = {
   agentId: string;
@@ -229,7 +231,17 @@ async function tickAgent(
   notes.push(cadence.reason);
 
   /* 3 — discovery runs even on quiet cycles: editorial life continues. */
-  const discovery = await discover(charter.sourcePlan);
+  //
+  // The query pool is the sourcePlan AND the beats, deduped. Overnight the wire
+  // went silent for nine hours: discovery kept returning 30+ candidates and
+  // dedupe eliminated every one, because six sourcePlan queries had already
+  // surfaced and spiked everything they could reach. Rejections are permanent,
+  // so a fixed query set means the reachable pool only ever shrinks. The beats
+  // roughly double the vocabulary and are on-topic by construction — they came
+  // from the same charter — which an untargeted front-page pull would not be.
+  const queryPool = [...charter.sourcePlan, ...charter.beats];
+
+  const discovery = await discover(queryPool);
   for (const a of discovery.adapters) {
     if (!a.ok) notes.push(`${a.source} unavailable: ${a.error}`);
   }
@@ -244,8 +256,8 @@ async function tickAgent(
   // narrow one, one widening pass over a different slice of the sourcePlan runs
   // before giving up. It costs HTTP requests, not LLM calls.
   if (fresh.length < MIN_DESK) {
-    const wider = await discover(charter.sourcePlan, {
-      offset: Math.ceil(charter.sourcePlan.length / 2),
+    const wider = await discover(queryPool, {
+      offset: Math.ceil(queryPool.length / 2),
     });
     totalFound += wider.candidates.length;
 
@@ -306,12 +318,34 @@ async function tickAgent(
   }
 
   /* 6 — the editorial gate. */
+  //
+  // A drought is only reported when the wire is actually open and behind: the
+  // gate has already said we may publish, it has been hours, and the day's
+  // target is unmet. In normal operation this is null and the editor never
+  // hears about timing at all.
+  const DROUGHT_AFTER_MIN = 240;
+  const minutesIdle = cadence.minutesSinceLastPost;
+  const drought =
+    cadence.mayPublish &&
+    minutesIdle !== null &&
+    minutesIdle >= DROUGHT_AFTER_MIN &&
+    postsToday < charter.cadence.postsPerDay
+      ? {
+          hours: Math.floor(minutesIdle / 60),
+          postsToday,
+          target: charter.cadence.postsPerDay,
+        }
+      : null;
+
+  if (drought) notes.push(`Drought: ${drought.hours}h idle, ${drought.postsToday}/${drought.target} filed today.`);
+
   const { decision, provider: judgeProvider } = await judge({
     persona: agent.persona,
     charter,
     candidates: desk,
     memory,
     priorDispatches,
+    drought,
     prefer,
   });
   provider = judgeProvider;
@@ -448,12 +482,14 @@ async function tickAgent(
 /* -------------------------------------------------------------------------- */
 
 /**
- * Drops candidates this agent has already published or already refused.
+ * Drops candidates this agent has already published or spiked.
  *
  * Matches on both normalised URL and normalised title, because the same story
  * reaches us from several adapters under slightly different headlines and with
  * different tracking parameters. This is also the safety net that lets Breeth
  * fail without risking a duplicate dispatch.
+ *
+ * Holds are treated differently from spikes — see the note inside.
  */
 async function dedupe(agentId: string, candidates: Candidate[]): Promise<Candidate[]> {
   const [publishedDocs, refusedDocs] = await Promise.all([
@@ -461,7 +497,10 @@ async function dedupe(agentId: string, candidates: Candidate[]): Promise<Candida
       .find({ agentId }, { projection: { _id: 0, candidate: 1 } })
       .toArray(),
     (await rejections())
-      .find({ agentId }, { projection: { _id: 0, url: 1, title: 1 } })
+      .find(
+        { agentId },
+        { projection: { _id: 0, url: 1, title: 1, verdict: 1, createdAt: 1 }, sort: { createdAt: 1 } },
+      )
       .toArray(),
   ]);
 
@@ -472,9 +511,33 @@ async function dedupe(agentId: string, candidates: Candidate[]): Promise<Candida
     if (p.candidate?.url) seenUrls.add(normaliseUrl(p.candidate.url));
     if (p.candidate?.title) seenTitles.add(normaliseTitle(p.candidate.title));
   }
+
+  // Sorted oldest-first above, so the last write for a URL wins here — a story
+  // held twice is governed by the most recent hold, not the first.
+  const latestVerdict = new Map<string, { verdict: string; at: number }>();
   for (const r of refusedDocs) {
-    if (r.url) seenUrls.add(normaliseUrl(r.url));
-    if (r.title) seenTitles.add(normaliseTitle(r.title));
+    if (!r.url) continue;
+    latestVerdict.set(normaliseUrl(r.url), {
+      verdict: r.verdict,
+      at: new Date(r.createdAt).getTime(),
+    });
+    if (r.verdict === "spike" && r.title) seenTitles.add(normaliseTitle(r.title));
+  }
+
+  const now = Date.now();
+  for (const [url, v] of latestVerdict) {
+    if (v.verdict === "spike") {
+      seenUrls.add(url);
+      continue;
+    }
+    // A hold is not a refusal, it is a deferral — "real but not yet, needs
+    // corroboration or a development". Treating it like a spike meant the one
+    // verdict that exists to be revisited never was, and every near-miss was
+    // burned permanently. That is how the wire talked itself into a nine-hour
+    // silence: at six cycles an hour it consumed its own candidate pool, and
+    // overnight nothing replenished it. Holds come back after a cooling-off
+    // period; genuine spikes never do.
+    if (now - v.at < HOLD_COOLDOWN_MS) seenUrls.add(url);
   }
 
   return candidates.filter(

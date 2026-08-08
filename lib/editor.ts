@@ -62,6 +62,11 @@ export async function judge(input: {
   memory: RecalledFact[];
   /** Actually-published dispatches, from Mongo. Concrete repetition check. */
   priorDispatches: Array<{ title: string; when: string; gist: string }>;
+  /**
+   * Set only when the wire has been open and silent for hours with the day's
+   * target unmet. Facts, not permission to lower the bar — see the prompt.
+   */
+  drought: { hours: number; postsToday: number; target: number } | null;
   prefer?: Provider;
 }): Promise<{ decision: EditorialDecision; provider: Provider }> {
   const { candidates } = input;
@@ -95,6 +100,16 @@ export async function judge(input: {
     "",
     memory
       ? `POSITIONS YOU HOLD (from your standing brief and past reasoning)\n${memory}`
+      : "",
+    "",
+    // Told as facts and explicitly not as licence. Overnight the wire went
+    // silent for nine hours; the refusals were all correct on the merits, but
+    // the editor had no idea it was in a drought, so a merely-good story and a
+    // sixth mediocre one looked identical to it. A newsroom knows the
+    // difference. It is still free to spike everything, and told so.
+    input.drought
+      ? `TIMING
+You have not filed in ${input.drought.hours} hours, and you have published ${input.drought.postsToday} of your ${input.drought.target} dispatches today. If a candidate here genuinely clears your bar, run it rather than holding out for a better story that may never arrive. If none of them does, spiking the whole desk is still the right call — do not lower your standards to fill a quota.`
       : "",
     "",
     `TODAY'S DESK (${candidates.length} candidates)`,
