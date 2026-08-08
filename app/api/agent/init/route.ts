@@ -77,6 +77,13 @@ export async function POST(req: Request) {
   let charterStatus: AgentDoc["charterStatus"] = "pending";
 
   try {
+    // TEMPORARY, test-only. Set TAAR_FORCE_CHARTER_FAILURE=1 in the environment
+    // to exercise the pending-charter recovery path against production without
+    // breaking real traffic or waiting for a genuine provider outage. Removed
+    // once that path has been proven live. Absent the variable this is a no-op.
+    if (process.env.TAAR_FORCE_CHARTER_FAILURE === "1") {
+      throw new Error("forced charter failure (test flag)");
+    }
     const built = await withTimeout(buildCharter(persona), CHARTER_TIMEOUT_MS);
     charter = built.charter;
     charterStatus = "ready";
