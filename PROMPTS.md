@@ -416,3 +416,79 @@ comparable.
   all six tokens present, `border-radius` only ever `0` or `1px`, and the single
   `box-shadow` string is Tailwind's reset variable rather than an applied
   shadow.
+
+---
+
+## 006 · The overnight silence
+
+**Date:** 2026-08-08
+**Tool:** Claude Code (Opus 5) in VS Code
+
+### Prompt
+
+> "i wake up, check all things now"
+
+### What the check found
+
+Every mechanical check was perfect and the product had still failed.
+
+```
+preflight       26 passed · 0 failed
+Actions         10 runs, 10 success, 9 schedule events
+schedulers      actions 02:14 · http 03:15 — both alive
+errors          zero
+Groq budget     998/1000 remaining
+posts           2        ← expected 5-6
+```
+
+**The wire had published nothing for nine and a half hours**, with its filing
+window open the entire time. Every cycle read the same thing:
+
+```
+03:15  found=32  fresh=0  spiked=0  llm=0
+03:00  found=33  fresh=1  spiked=1  llm=1
+02:15  found=30  fresh=0  spiked=0  llm=0
+```
+
+Discovery was finding 30+ candidates a cycle and dedupe was eliminating every
+one. This is the most useful thing the soak produced: a failure that no
+green check could have caught, because nothing was broken. It was working
+exactly as written, and what was written was wrong.
+
+### Corrected
+
+- **A hold is not a refusal, and dedupe treated it as one.** `hold` means "real
+  but not yet — needs corroboration or a development", and holds were being
+  excluded forever, identically to spikes. The one verdict that exists in order
+  to be revisited never was. At six cycles an hour the editor consumed its own
+  candidate pool, permanently burning every near-miss, and overnight nothing
+  replenished it. Holds now return after a three-hour cooling-off. **This alone
+  turned a silent cycle into a published dispatch — and the story it filed,
+  "Triton for MTIA", was one it had held at score 60 hours earlier.**
+- **The query pool was too small to sustain a long run.** Six queries against a
+  permanently shrinking reachable set. The pool is now the sourcePlan *and* the
+  beats — roughly double, and on-topic by construction since both came from the
+  same charter. An untargeted front-page pull was considered and rejected for
+  exactly that reason: it would have flooded a desk capped at eight with
+  off-beat noise.
+- **Rotation was inert half the time.** The slot was computed per 30 minutes
+  while the fastest scheduler fires every 15, so consecutive cycles re-ran
+  identical queries.
+- **Queries were shallow** — 8 results each. Now 20 for Hacker News, 15 for
+  arXiv, 12 for news.
+- **The editor did not know it was in a drought.** Checked before assuming the
+  bar was wrong: across 60 refusals the mean score was 27.5 and only ten ever
+  reached 50, so the refusals were correct on the merits and the material was
+  genuinely poor. The bar stayed. What changed is that the editor is now told
+  the hours idle and the day's count as facts, and told explicitly that spiking
+  the whole desk is still right if nothing clears — a newsroom knows the
+  difference between a merely-good story and a sixth mediocre one, and it had
+  no way to.
+
+### Verified
+
+Two cycles watched after the change, per the standing rule on pipeline edits.
+`fresh` went from a flat zero to 5, then 4, then 3; one cycle published; the
+next was correctly held by cadence two minutes later. The published dispatch's
+rationale names all three candidates it beat, by title — the honesty fix from
+005 working on its first real outing.
