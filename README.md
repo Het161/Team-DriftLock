@@ -346,14 +346,28 @@ reader sees. Running both on the 70b meant the cheap frequent task exhausted the
 budget for the expensive rare one — the wire went dark with the quality model
 untouched. Splitting them gives the gate its own daily bucket.
 
-**Steady state, projected to four agents** (our two demos, the evaluator's, and
-one spare) at a combined cadence of ~2.9 cycles/hour/agent:
+**Measured over 11 hours of real unattended running**, two agents, current
+cadence — these replace an earlier projection that was optimistic by 2.2×,
+because it estimated how often the gate fires instead of counting it:
 
-| Bucket | Daily use | Cap | Headroom |
-| --- | --- | --- | --- |
-| 8b — gate | ~24 calls × 1,750 × 4 agents ≈ **168k** | 500k/day | **3.0×** |
-| 70b — writer + charter | 3 × 1,700 × 4 agents ≈ **20.4k** | 100k/day | **4.9×** |
-| Gemini 2.5 Flash | emergency only | **20 requests/day** | — |
+| Per agent per day | 8b (gate) | 70b (writer + charter) |
+| --- | --- | --- |
+| Measured | **91,000** tokens | **7,500** tokens |
+
+| Agents | 8b vs 500k/day | 70b vs 100k/day |
+| --- | --- | --- |
+| 2 (today) | 182k — **2.7×** | 15k — **6.6×** |
+| 3 (＋ the evaluator's) | 273k — **1.8×** | 23k — **4.4×** |
+| 4 | 364k — **1.4×** | 30k — **3.3×** |
+
+Gemini 2.5 Flash sits outside both columns at **20 requests/day**, emergency
+only.
+
+The realistic case during judging is three agents, which fits with room to
+spare. Four still fits. The honest caveat is that the headroom on the gate
+bucket is thinner than the writer's, and that the 500k figure is Groq's
+published free-tier number rather than one we have observed — we have never
+reached it.
 
 Roughly three quarters of cycles cost nothing at all: when dedupe leaves no
 fresh candidate the gate never runs, and outside the filing window the desk is
