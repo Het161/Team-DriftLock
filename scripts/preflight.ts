@@ -14,6 +14,7 @@
  */
 
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { join, extname } from "node:path";
 import { loadEnv } from "./_env";
 
@@ -189,6 +190,13 @@ async function main() {
     check(`no ${label}`, hits.length === 0, hits.slice(0, 4).join("\n    "));
   }
 
+  /* --- secrets ------------------------------------------------------------ */
+  section("Secrets");
+
+  for (const [label, hits] of scanSecrets()) {
+    check(`no ${label} in tracked files`, hits.length === 0, hits.slice(0, 3).join("\n    "));
+  }
+
   /* --- summary ------------------------------------------------------------ */
   const colour = fail ? C.red : C.green;
   console.log(`\n${colour}${C.bold}${pass} passed · ${fail} failed${C.reset}`);
@@ -223,6 +231,66 @@ function tracked(path: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Scans every git-tracked file for credential patterns.
+ *
+ * Deliberately driven by `git ls-files` rather than a directory walk: what
+ * matters is what is *committed*, and that includes Markdown. PROMPTS.md is a
+ * required public deliverable that quotes freely from working sessions, so it
+ * is exactly the file most likely to carry a key by accident.
+ *
+ * The CRON_SECRET pattern is read from the environment rather than written
+ * down. Hardcoding the literal here would put the secret into the repository
+ * in the very check meant to keep it out.
+ */
+function scanSecrets(): Array<[string, string[]]> {
+  const patterns: Array<{ label: string; re: RegExp }> = [
+    { label: "Groq key", re: /gsk_[A-Za-z0-9]{20,}/ },
+    { label: "Google/Gemini key", re: /\bAIza[0-9A-Za-z_-]{30,}\b/ },
+    { label: "Gemini express key", re: /\bAQ\.[A-Za-z0-9_-]{20,}\b/ },
+    { label: "Mongo URI with credentials", re: /mongodb(\+srv)?:\/\/[^\s"']+:[^\s"'@]+@/ },
+  ];
+
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && cronSecret.length >= 12) {
+    patterns.push({
+      label: "current CRON_SECRET",
+      re: new RegExp(cronSecret.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    });
+  }
+
+  const hits = new Map<string, string[]>(patterns.map((p) => [p.label, []]));
+
+  let files: string[] = [];
+  try {
+    files = execSync("git ls-files", { encoding: "utf8" }).split("\n").filter(Boolean);
+  } catch {
+    return [...hits.entries()];
+  }
+
+  for (const file of files) {
+    // This script necessarily contains the patterns it looks for.
+    if (file.endsWith("scripts/preflight.ts")) continue;
+    // .env.example carries placeholders shaped like the real thing.
+    if (file === ".env.example") continue;
+
+    let text: string;
+    try {
+      text = readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
+
+    text.split("\n").forEach((line, i) => {
+      for (const p of patterns) {
+        if (p.re.test(line)) hits.get(p.label)!.push(`${file}:${i + 1}`);
+      }
+    });
+  }
+
+  return [...hits.entries()];
 }
 
 /** Greps the source tree, skipping build output and dependencies. */
