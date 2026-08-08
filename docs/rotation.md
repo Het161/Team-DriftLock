@@ -81,9 +81,9 @@ done
 ```bash
 for K in MONGODB_URI GROQ_API_KEY GEMINI_API_KEY BREETH_API_KEY CRON_SECRET; do
   V=$(grep "^$K=" .env.local | cut -d= -f2- | sed 's/^"//;s/"$//')
-  gh secret set "$K" --repo Het161/taar --body "$V"
+  gh secret set "$K" --repo Het161/Team-DriftLock --body "$V"
 done
-gh secret list --repo Het161/taar
+gh secret list --repo Het161/Team-DriftLock
 ```
 
 ### 5 · Update cron-job.org — **manual, do not forget**

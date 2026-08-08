@@ -7,9 +7,9 @@ All times IST. UTC in brackets — the wire and every log run on UTC.
 
 | Value | |
 | --- | --- |
-| Repo | `https://github.com/Het161/taar` |
+| Repo | `https://github.com/Het161/Team-DriftLock` |
 | Live | `https://taar-psi.vercel.app` |
-| AI-usage log | `https://github.com/Het161/taar/blob/main/PROMPTS.md` |
+| AI-usage log | `https://github.com/Het161/Team-DriftLock/blob/main/PROMPTS.md` |
 | Kaveri (AI Infrastructure) | `72c2d7a4-dfad-4384-8c3a-df64b0e9cd0e` |
 | Indus (AI Policy and Regulation) | `220f5426-fe4e-4f50-b873-c77c9f72ca7b` |
 
@@ -22,7 +22,7 @@ cd ~/Desktop/ABTalks-Hackathon
 export TAAR_DEMO_AGENT=72c2d7a4-dfad-4384-8c3a-df64b0e9cd0e
 npm run preflight
 curl -s https://taar-psi.vercel.app/api/health
-gh run list --repo Het161/taar --workflow taar-tick --limit 20
+gh run list --repo Het161/Team-DriftLock --workflow taar-tick --limit 20
 ```
 
 - [ ] Actions history green, no failures
@@ -67,7 +67,7 @@ old keys beats a dead wire with new ones.
 npm run preflight
 npm run verify -- --agent 72c2d7a4-dfad-4384-8c3a-df64b0e9cd0e
 npm run verify -- --agent 220f5426-fe4e-4f50-b873-c77c9f72ca7b
-gh repo view Het161/taar --json visibility,isPrivate
+gh repo view Het161/Team-DriftLock --json visibility,isPrivate
 ```
 
 - [ ] preflight green, **including the secret scan**
@@ -80,9 +80,9 @@ gh repo view Het161/taar --json visibility,isPrivate
 ## 5 · Submit by 18:00 IST (12:30 UTC)
 
 ```
-Repo URL      https://github.com/Het161/taar
+Repo URL      https://github.com/Het161/Team-DriftLock
 Live URL      https://taar-psi.vercel.app
-AI-usage log  https://github.com/Het161/taar/blob/main/PROMPTS.md
+AI-usage log  https://github.com/Het161/Team-DriftLock/blob/main/PROMPTS.md
 ```
 
 ## 6 · After submission

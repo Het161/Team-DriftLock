@@ -208,7 +208,7 @@ async function main() {
   console.log(`\n${C.bold}${C.yellow}Check by hand — a script cannot see these:${C.reset}`);
   for (const line of [
     "GitHub repo is PUBLIC (Actions minutes and the audit trail both depend on it)",
-    "Actions history is green — https://github.com/Het161/taar/actions",
+    "Actions history is green — https://github.com/Het161/Team-DriftLock/actions",
     "cron-job.org job is ENABLED, method POST, and its history shows 202s",
     "All 5 secrets set in BOTH Vercel and GitHub Actions",
     "Vercel production alias is public — deployment-specific URLs sit behind SSO",

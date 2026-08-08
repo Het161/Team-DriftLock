@@ -9,7 +9,7 @@ consistent editorial voice, remembers what it has already argued, and keeps
 filing for days — with zero human input.
 
 **Live:** https://taar-psi.vercel.app
-**Source:** https://github.com/Het161/taar
+**Source:** https://github.com/Het161/Team-DriftLock
 
 > Built for the ABTalks Vibe-Code Hackathon. Everything runs on free tiers.
 > See [PROMPTS.md](PROMPTS.md) for the full build log — every session's prompt,
@@ -352,7 +352,7 @@ different things, and only the last one is what the product actually promises.
 ### 1. The pipeline runs on remote infrastructure
 
 GitHub Actions run
-[#31195015752](https://github.com/Het161/taar/actions/runs/31195015752),
+[#31195015752](https://github.com/Het161/Team-DriftLock/actions/runs/31195015752),
 manually dispatched at `15:55:17Z`:
 
 ```
@@ -384,7 +384,7 @@ PINGER FIRED — http advanced to: 2026-08-07T17:00:52.624Z
 ```
 
 **GitHub Actions `schedule`**, run
-[#31202420109](https://github.com/Het161/taar/actions/runs/31202420109) at
+[#31202420109](https://github.com/Het161/Team-DriftLock/actions/runs/31202420109) at
 `17:27:59Z` — the `:09` slot delivered ~19 minutes late, which is the documented
 drift, not a fault:
 
@@ -586,7 +586,7 @@ dispatch, so this is always visible rather than silent.
 
 | Criterion | How it is met | Where to look |
 | --- | --- | --- |
-| **Autonomous operation after init** | GitHub Actions cron drives everything; Vercel only serves. Mongo lease makes a redundant second trigger safe. Per-agent try/catch so one failure can't starve others. | [.github/workflows/tick.yml](.github/workflows/tick.yml), [lib/tick.ts](lib/tick.ts), [lib/lock.ts](lib/lock.ts) · [Actions history](https://github.com/Het161/taar/actions) |
+| **Autonomous operation after init** | GitHub Actions cron drives everything; Vercel only serves. Mongo lease makes a redundant second trigger safe. Per-agent try/catch so one failure can't starve others. | [.github/workflows/tick.yml](.github/workflows/tick.yml), [lib/tick.ts](lib/tick.ts), [lib/lock.ts](lib/lock.ts) · [Actions history](https://github.com/Het161/Team-DriftLock/actions) |
 | **Quality of editorial decision-making** | All candidates judged in **one comparative call** — scoring in isolation yields a pile of 70s with no ranking. Named thresholds from the charter. The winner is re-derived, never trusted, because models sometimes nominate a candidate they simultaneously spiked. | [lib/editor.ts](lib/editor.ts) · `/newsroom/[agentId]#the-spike` |
 | **Persona consistency** | The charter is written once at init from the two words the evaluator supplies, then obeyed forever. Nothing in the product is hardcoded to a persona. Cadence and voice are read from it every cycle. | [lib/charter.ts](lib/charter.ts) · `/newsroom/[agentId]#the-charter` |
 | **Effective use of memory** | Breeth episodes written as subject-verb prose so the graph can actually extract edges; recall at the start of every cycle. Prior *dispatches* come from Mongo, because memory mixes charter seeds with publishing history and a prompt cannot tell them apart. | [lib/breeth.ts](lib/breeth.ts), [lib/tick.ts](lib/tick.ts) · `/newsroom/[agentId]#what-the-editor-remembers` |

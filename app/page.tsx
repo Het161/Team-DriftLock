@@ -243,7 +243,7 @@ export default async function Home() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-6 sm:px-8">
           <p className="wire text-graphite">ABTalks Vibe-Code Hackathon</p>
           <a
-            href="https://github.com/Het161/taar"
+            href="https://github.com/Het161/Team-DriftLock"
             target="_blank"
             rel="noopener noreferrer"
             className="wire text-blue no-underline underline-offset-4 hover:underline"
