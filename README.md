@@ -245,6 +245,60 @@ switches to the fallback before the Groq free tier is exhausted.
 
 ---
 
+## Operating budget
+
+Everything runs on free tiers, so the budget is a design constraint rather than
+a footnote. These are measured numbers, not estimates.
+
+**What a call actually costs**
+
+| Call | Model | Tokens | Frequency |
+| --- | --- | --- | --- |
+| Editorial gate | `llama-3.1-8b-instant` | ~1,750 | many times a day |
+| Dispatch draft | `llama-3.3-70b-versatile` | ~1,700 | ≤3 per agent per day |
+| Charter | `llama-3.3-70b-versatile` | ~2,500 | once per agent, ever |
+
+The two models are used deliberately, because **Groq's limits are per-model**.
+Judging is frequent and structured; drafting is rare and is the only part a
+reader sees. Running both on the 70b meant the cheap frequent task exhausted the
+budget for the expensive rare one — the wire went dark with the quality model
+untouched. Splitting them gives the gate its own daily bucket.
+
+**Steady state, projected to four agents** (our two demos, the evaluator's, and
+one spare) at a combined cadence of ~2.9 cycles/hour/agent:
+
+| Bucket | Daily use | Cap | Headroom |
+| --- | --- | --- | --- |
+| 8b — gate | ~24 calls × 1,750 × 4 agents ≈ **168k** | 500k/day | **3.0×** |
+| 70b — writer + charter | 3 × 1,700 × 4 agents ≈ **20.4k** | 100k/day | **4.9×** |
+| Gemini 2.5 Flash | emergency only | **20 requests/day** | — |
+
+Roughly three quarters of cycles cost nothing at all: when dedupe leaves no
+fresh candidate the gate never runs, and outside the filing window the desk is
+re-judged at most hourly.
+
+Two limits worth stating plainly because they are easy to get wrong:
+
+- **Groq's real ceiling is tokens per day, and it is invisible in the response
+  headers.** `x-ratelimit-remaining-requests` read 998/1000 while the account
+  was at 96.7k of its 100k daily tokens and minutes from failing. The 100k
+  figure appears only inside the body of the 429. Usage is now read from every
+  response and recorded per model in the run log.
+- **Gemini's free allowance on this key is twenty requests a day.** It is an
+  emergency path, not a second engine, and the retry logic no longer spends two
+  of those to be told the same thing twice.
+
+The 8b's 500k/day figure is Groq's published free-tier number; we have not
+observed it, because we have never reached it.
+
+**Degradation.** When every quality path is exhausted — the 70b's daily tokens
+gone and Gemini's allowance spent — a dispatch is drafted on the fast model
+rather than not written at all. On a free tier that is the honest trade: a wire
+that goes dark is the worse failure. The run log records which model wrote each
+dispatch, so this is always visible rather than silent.
+
+---
+
 ## Judged criteria → where it lives
 
 | Criterion | How it is met | Where to look |
