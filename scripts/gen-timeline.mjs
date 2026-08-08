@@ -111,12 +111,12 @@ function column(i, s) {
   <polygon points="${left.map(pt).join(" ")}" fill="${fL}"/>
   <polygon points="${right.map(pt).join(" ")}" fill="${fR}"/>
   <polygon points="${top.map(pt).join(" ")}" fill="${fT}" stroke="${onDark ? fT : RULE}" stroke-width="1.2"/>
-  <g transform="${onPlane(x + 15, y + 32, h)}">
-    <text font-family="ui-monospace,monospace" font-size="17" fill="${onDark ? PAPER : INK}">${s.broke}</text>
+  <g transform="${onPlane(x + 13, y + 34, h)}">
+    <text font-family="ui-monospace,monospace" font-size="22" fill="${onDark ? PAPER : INK}">${s.broke}</text>
   </g>
   <g transform="${onPlane(x - 2, y + CW + (i % 2 ? 46 : 18), 0)}">
-    <text font-family="ui-monospace,monospace" font-size="11" letter-spacing="0.8" fill="${BLUE}">${esc(s.id)}</text>
-    <text y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="${GRAPHITE}">${esc(s.title)}</text>
+    <text font-family="ui-monospace,monospace" font-size="14" letter-spacing="1" fill="${BLUE}">${esc(s.id)}</text>
+    <text y="18" font-family="ui-sans-serif,system-ui" font-size="13.5" fill="${GRAPHITE}">${esc(s.title)}</text>
   </g>`;
 }
 
@@ -135,17 +135,17 @@ const total = sessions.reduce((a, s) => a + s.broke, 0);
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${X0.toFixed(0)} ${Y0.toFixed(0)} ${VW.toFixed(0)} ${VH.toFixed(0)}" width="${VW.toFixed(0)}" height="${VH.toFixed(0)}" font-family="ui-sans-serif,system-ui">
   <rect x="${X0.toFixed(0)}" y="${Y0.toFixed(0)}" width="${VW.toFixed(0)}" height="${VH.toFixed(0)}" fill="${PAPER}"/>
 
-  <text x="${(X0 + 30).toFixed(0)}" y="${(Y0 + 52).toFixed(0)}" font-family="ui-serif,Georgia,serif" font-size="29" fill="${INK}">What broke, per session</text>
-  <text x="${(X0 + 30).toFixed(0)}" y="${(Y0 + 76).toFixed(0)}" font-family="ui-monospace,monospace" font-size="10.5" letter-spacing="1.2" fill="${GRAPHITE}">${total} CORRECTIONS ACROSS ${sessions.length} SESSIONS · COUNTED FROM THIS FILE, NOT ESTIMATED</text>
+  <text x="${(X0 + 30).toFixed(0)}" y="${(Y0 + 52).toFixed(0)}" font-family="ui-serif,Georgia,serif" font-size="34" fill="${INK}">What broke, per session</text>
+  <text x="${(X0 + 30).toFixed(0)}" y="${(Y0 + 76).toFixed(0)}" font-family="ui-monospace,monospace" font-size="13" letter-spacing="1.4" fill="${GRAPHITE}">${total} CORRECTIONS ACROSS ${sessions.length} SESSIONS · COUNTED FROM THIS FILE, NOT ESTIMATED</text>
 
   ${ground()}
   ${sessions.map((s, i) => column(i, s)).join("\n")}
 
   <g transform="translate(${(X0 + 30).toFixed(0)}, ${(Y1 - 44).toFixed(0)})">
     <rect width="13" height="13" fill="${STAMP}"/>
-    <text x="20" y="11" font-family="ui-sans-serif,system-ui" font-size="11.5" fill="${INK}">006 — the outage where every check stayed green</text>
+    <text x="20" y="11" font-family="ui-sans-serif,system-ui" font-size="14" fill="${INK}">006 — the outage where every check stayed green</text>
     <rect y="20" width="13" height="13" fill="${BLUE}"/>
-    <text x="20" y="31" font-family="ui-sans-serif,system-ui" font-size="11.5" fill="${INK}">sessions where eight or more things broke at once</text>
+    <text x="20" y="31" font-family="ui-sans-serif,system-ui" font-size="14" fill="${INK}">sessions where eight or more things broke at once</text>
   </g>
 </svg>
 `;

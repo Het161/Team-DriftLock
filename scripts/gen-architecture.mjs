@@ -8,22 +8,19 @@
  * app/globals.css. Depth comes from shading the three visible faces, which is
  * how a solid actually looks — the design system bans drop shadows.
  *
- * Two numbers govern the whole layout, and both were learned by getting them
- * wrong:
+ * Three numbers govern the layout, all learned by getting them wrong:
  *
  *   1. A plane's projected height is (W + D) / 2. The vertical gap between
- *      planes must exceed it or the slabs intersect. First attempt used 220
- *      against a plane height of 380.
+ *      planes must exceed it or the slabs intersect.
  *
- *   2. A box's projected height is (w + h) / 2 — its WIDTH contributes. So two
- *      218-wide boxes stacked 62 apart in plane-space are separated by only
- *      31px on screen while each occupies 126px, and they overlap almost
- *      completely. Boxes therefore tile along x in a single diagonal row, where
- *      the x-step buys real vertical clearance.
+ *   2. A box's projected height is (w + h) / 2 — its WIDTH contributes. Boxes
+ *      therefore tile along one diagonal row, where the x-step buys real
+ *      vertical clearance, rather than stacking in rows.
  *
- * Plane labels sit in screen space beside each slab rather than on it, because
- * on-plane text shears and collided with the first row of boxes no matter how
- * the rows were spaced.
+ *   3. Type is sized for the DISPLAYED width, not the SVG's own. A README
+ *      column is about 900px, so an 1100px drawing renders at ~0.8 scale and
+ *      10px type arrives as 8px — unreadable. Boxes are sized around 15px
+ *      type here, not the other way round.
  */
 
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -40,16 +37,18 @@ const FACE_R = "#EAE7DD";
 const FACE_L = "#D7D3C6";
 
 /* Geometry ---------------------------------------------------------------- */
-const W = 520;
-const D = 240;
-const T = 14;
-const GAP = 430; // > (W + D) / 2 = 380
+const W = 680; // narrower drawing = less downscaling in a README column
+const D = 150; // shallow on purpose: a strip the boxes actually fill
+const T = 16; // slab thickness
+const GAP = 430; // > (W + D) / 2 = 415
 
-const CW = 132; // box width
-const CH = 34; // box height
-const STEP = 176; // x-step: 176/2 = 88 clearance > (132+34)/2 = 83
-const ROW_Y = 74; // single row, leaving the front band free for arrows
-const ARROW_Y = 196;
+const CW = 170; // box width, sized for 16px type
+const CH = 50;
+const STEP = 226; // 113 clearance > (170 + 50) / 2 = 110
+const ROW_Y = 40;
+const ARROW_Y = 118;
+const GUTTER = 240; // left column for plane labels — every pixel here
+// costs legibility, because it widens the drawing and so shrinks it on screen
 
 const COS30 = Math.cos(Math.PI / 6);
 const P = (x, y, z) => [(x - y) * COS30, (x + y) * 0.5 - z];
@@ -60,6 +59,15 @@ const onPlane = (x, y, z) => {
 };
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+const Z = { trigger: GAP * 3, exec: GAP * 2, state: GAP, serve: 0 };
+
+const TOP = -Z.trigger - 165;
+const BOTTOM = (W + D) / 2 + 140;
+const H = Math.round(BOTTOM - TOP);
+const X0 = Math.round(-D * COS30 - GUTTER);
+const VW = Math.round(W * COS30 - X0 + 70);
+const LX = X0 + 26; // left text margin, shared by labels and captions
+
 function slab(z) {
   const top = [P(0, 0, z), P(W, 0, z), P(W, D, z), P(0, D, z)];
   const right = [P(W, 0, z), P(W, D, z), P(W, D, z - T), P(W, 0, z - T)];
@@ -67,47 +75,42 @@ function slab(z) {
   return `
   <polygon points="${left.map(pt).join(" ")}" fill="${FACE_L}"/>
   <polygon points="${right.map(pt).join(" ")}" fill="${FACE_R}"/>
-  <polygon points="${top.map(pt).join(" ")}" fill="${RAISED}" stroke="${RULE}" stroke-width="1.5"/>`;
+  <polygon points="${top.map(pt).join(" ")}" fill="${RAISED}" stroke="${RULE}" stroke-width="1.6"/>`;
 }
 
-/** Plane label, in screen space to the left of the slab. */
+/**
+ * Plane label, in screen space, aligned to the slab's vertical MIDDLE — so it
+ * reads as belonging to the whole plane rather than to its nearest corner.
+ */
 function label(z, num, name, sub) {
-  const [, y] = P(0, D, z);
+  const mid = (P(0, 0, z)[1] + P(W, D, z)[1]) / 2;
+  const edge = P(0, D / 2, z)[0];
   return `
-  <text x="-306" y="${(y - 26).toFixed(1)}" font-family="ui-monospace,monospace" font-size="13" letter-spacing="1.6" fill="${BLUE}">${esc(num)} ${esc(name)}</text>
-  <text x="-306" y="${(y - 8).toFixed(1)}" font-family="ui-sans-serif,system-ui" font-size="11.5" fill="${GRAPHITE}">${esc(sub)}</text>
-  <line x1="-306" y1="${(y - 2).toFixed(1)}" x2="${(P(0, D, z)[0] - 14).toFixed(1)}" y2="${(y - 2).toFixed(1)}" stroke="${RULE}" stroke-width="1.5"/>`;
+  <text x="${LX}" y="${(mid - 12).toFixed(1)}" font-family="ui-monospace,monospace" font-size="19" letter-spacing="2" fill="${BLUE}">${esc(num)} ${esc(name)}</text>
+  <text x="${LX}" y="${(mid + 12).toFixed(1)}" font-family="ui-sans-serif,system-ui" font-size="14.5" fill="${GRAPHITE}">${esc(sub)}</text>
+  <line x1="${LX}" y1="${(mid + 26).toFixed(1)}" x2="${(edge - 18).toFixed(1)}" y2="${(mid + 26).toFixed(1)}" stroke="${RULE}" stroke-width="1.6"/>`;
 }
 
-/** A box laid flat on a plane, at slot n of the diagonal row. */
 function box(n, z, title, meta, accent = INK) {
   return `
-  <g transform="${onPlane(26 + n * STEP, ROW_Y, z)}">
-    <rect width="${CW}" height="${CH}" fill="${PAPER}" stroke="${accent}" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="${INK}">${esc(title)}</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="${GRAPHITE}">${esc(meta)}</text>
+  <g transform="${onPlane(28 + n * STEP, ROW_Y, z)}">
+    <rect width="${CW}" height="${CH}" fill="${PAPER}" stroke="${accent}" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="${INK}">${esc(title)}</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="${GRAPHITE}">${esc(meta)}</text>
   </g>`;
 }
 
-/** Vertical drop between planes — a pure z change is vertical on screen. */
 function drop(x, zFrom, zTo, text, colour = BLUE, at = 0.5) {
   const a = P(x, ARROW_Y, zFrom - T);
   const b = P(x, ARROW_Y, zTo);
   return `
-  <line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${(b[1] - 7).toFixed(1)}"
-        stroke="${colour}" stroke-width="1.8" marker-end="url(#head${colour === BLUE ? "" : "g"})"/>
-  <text x="${(a[0] + 9).toFixed(1)}" y="${(a[1] + (b[1] - a[1]) * at).toFixed(1)}"
-        font-family="ui-monospace,monospace" font-size="9.5" letter-spacing="0.4" fill="${colour}">${esc(text)}</text>`;
+  <line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${(b[1] - 8).toFixed(1)}"
+        stroke="${colour}" stroke-width="2" marker-end="url(#head${colour === BLUE ? "" : "g"})"/>
+  <text x="${(a[0] + 12).toFixed(1)}" y="${(a[1] + (b[1] - a[1]) * at).toFixed(1)}"
+        font-family="ui-monospace,monospace" font-size="13" letter-spacing="0.5" fill="${colour}">${esc(text)}</text>`;
 }
 
-const Z = { trigger: GAP * 3, exec: GAP * 2, state: GAP, serve: 0 };
-
-/* Bounds: title above plane ①, footer below plane ④'s front edge at (W+D)/2. */
-const TOP = -Z.trigger - 120;
-const BOTTOM = (W + D) / 2 + 110;
-const H = BOTTOM - TOP;
-
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-330 ${TOP} 1090 ${H}" width="1090" height="${H}" font-family="ui-sans-serif,system-ui">
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${X0} ${TOP} ${VW} ${H}" width="${VW}" height="${H}" font-family="ui-sans-serif,system-ui">
   <defs>
     <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="${BLUE}"/>
@@ -119,37 +122,37 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-330 ${TOP} 1090 $
       <path d="M 0 0 L 10 5 L 0 10 z" fill="${STAMP}"/>
     </marker>
   </defs>
-  <rect x="-330" y="${TOP}" width="1090" height="${H}" fill="${PAPER}"/>
+  <rect x="${X0}" y="${TOP}" width="${VW}" height="${H}" fill="${PAPER}"/>
 
-  <text x="-306" y="${TOP + 56}" font-family="ui-serif,Georgia,serif" font-size="30" fill="${INK}">TAAR — the four planes</text>
-  <text x="-306" y="${TOP + 80}" font-family="ui-monospace,monospace" font-size="10.5" letter-spacing="1.3" fill="${GRAPHITE}">THE DEPLOYMENT SERVES THE FEED. IT IS NOT WHAT FILLS IT.</text>
+  <text x="${LX}" y="${TOP + 66}" font-family="ui-serif,Georgia,serif" font-size="38" fill="${INK}">TAAR — the four planes</text>
+  <text x="${LX}" y="${TOP + 96}" font-family="ui-monospace,monospace" font-size="13.5" letter-spacing="1.5" fill="${GRAPHITE}">THE DEPLOYMENT SERVES THE FEED. IT IS NOT WHAT FILLS IT.</text>
 
   ${slab(Z.trigger)}
   ${label(Z.trigger, "①", "TRIGGER", "two schedulers, both always on")}
-  ${box(0, Z.trigger, "GitHub Actions", "cron 9,39")}
-  ${box(1, Z.trigger, "cron-job.org", "every 30 min")}
-  ${box(2, Z.trigger, "either may stall", "other covers ~20 min", GRAPHITE)}
+  ${box(0, Z.trigger, "GitHub Actions", "cron 9,39 hourly")}
+  ${box(1, Z.trigger, "cron-job.org", "every 30 minutes")}
+  ${box(2, Z.trigger, "either may stall", "other covers, ~20 min", GRAPHITE)}
 
-  ${drop(120, Z.trigger, Z.exec, "runs tick.ts on GitHub's own runner")}
-  ${drop(410, Z.trigger, Z.serve + 116, "POST + bearer", GRAPHITE, 0.17)}
+  ${drop(130, Z.trigger, Z.exec, "runs tick.ts on GitHub's runner")}
+  ${drop(540, Z.trigger, Z.serve, "POST + bearer", GRAPHITE, 0.12)}
 
   ${slab(Z.exec)}
   ${label(Z.exec, "②", "EXECUTION", "lib/tick.ts — one cycle, from either trigger")}
-  ${box(0, Z.exec, "discover → judge → file", "13 steps · 8 calls max", BLUE)}
-  ${box(1, Z.exec, "Mongo lease, 8 min", "2nd arrival exits")}
+  ${box(0, Z.exec, "discover → judge", "then file, or not", BLUE)}
+  ${box(1, Z.exec, "Mongo lease, 8 min", "second arrival exits")}
   ${box(2, Z.exec, "roster by lastRunAt", "3 agents, rotating")}
 
-  ${drop(96, Z.exec, Z.state, "read + write")}
-  ${drop(300, Z.exec, Z.state, "recall / remember", GRAPHITE)}
-  ${drop(470, Z.exec, Z.state, "fetch", GRAPHITE)}
+  ${drop(104, Z.exec, Z.state, "read + write")}
+  ${drop(330, Z.exec, Z.state, "recall / remember", GRAPHITE)}
+  ${drop(600, Z.exec, Z.state, "fetch", GRAPHITE)}
 
   ${slab(Z.state)}
-  ${label(Z.state, "③", "STATE · MEMORY · SOURCES", "what a cycle reads from and writes to")}
-  ${box(0, Z.state, "MongoDB Atlas M0", "5 collections")}
+  ${label(Z.state, "③", "STATE", "Mongo, memory, models and the four sources")}
+  ${box(0, Z.state, "MongoDB Atlas M0", "five collections")}
   ${box(1, Z.state, "Breeth graph", "scoped per agent")}
   ${box(2, Z.state, "Groq 8b + 70b", "Gemini in reserve")}
 
-  ${drop(120, Z.state, Z.serve, "read-only projection")}
+  ${drop(130, Z.state, Z.serve, "read-only projection")}
 
   ${slab(Z.serve)}
   ${label(Z.serve, "④", "SERVING", "Vercel Hobby — serves, never drives")}
@@ -157,20 +160,20 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-330 ${TOP} 1090 $
   ${box(1, Z.serve, "GET /api/agent/feed", "five fields, forever", BLUE)}
   ${box(2, Z.serve, "wire · newsroom", "server components")}
 
-  <g transform="${onPlane(-190, 150, Z.serve)}">
-    <rect width="140" height="34" fill="${PAPER}" stroke="${STAMP}" stroke-width="1.5" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="${INK}">Evaluator</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="${GRAPHITE}">init once, then polls</text>
+  <g transform="${onPlane(-232, 104, Z.serve)}">
+    <rect width="180" height="50" fill="${PAPER}" stroke="${STAMP}" stroke-width="1.8" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="${INK}">Evaluator</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="${GRAPHITE}">init once, then polls</text>
   </g>
-  <line x1="${P(-44, 162, Z.serve)[0].toFixed(1)}" y1="${P(-44, 162, Z.serve)[1].toFixed(1)}"
-        x2="${P(18, 116, Z.serve)[0].toFixed(1)}" y2="${P(18, 116, Z.serve)[1].toFixed(1)}"
-        stroke="${STAMP}" stroke-width="1.8" marker-end="url(#headr)"/>
+  <line x1="${P(-42, 112, Z.serve)[0].toFixed(1)}" y1="${P(-42, 112, Z.serve)[1].toFixed(1)}"
+        x2="${P(18, 72, Z.serve)[0].toFixed(1)}" y2="${P(18, 72, Z.serve)[1].toFixed(1)}"
+        stroke="${STAMP}" stroke-width="2" marker-end="url(#headr)"/>
 
-  <text x="-306" y="${BOTTOM - 62}" font-family="ui-monospace,monospace" font-size="10.5" letter-spacing="0.8" fill="${GRAPHITE}">PLANE ① REACHES PLANE ③ BY TWO INDEPENDENT ROUTES — ONE THROUGH VERCEL, ONE AROUND IT.</text>
-  <text x="-306" y="${BOTTOM - 44}" font-family="ui-monospace,monospace" font-size="10.5" letter-spacing="0.8" fill="${GRAPHITE}">EITHER PROVIDER CAN BE DOWN AND THE WIRE KEEPS FILING.</text>
+  <text x="${LX}" y="${BOTTOM - 74}" font-family="ui-monospace,monospace" font-size="13" letter-spacing="1" fill="${GRAPHITE}">PLANE ① REACHES PLANE ③ BY TWO INDEPENDENT ROUTES — ONE THROUGH VERCEL, ONE AROUND IT.</text>
+  <text x="${LX}" y="${BOTTOM - 50}" font-family="ui-monospace,monospace" font-size="13" letter-spacing="1" fill="${GRAPHITE}">EITHER PROVIDER CAN BE DOWN AND THE WIRE KEEPS FILING.</text>
 </svg>
 `;
 
 mkdirSync("docs", { recursive: true });
 writeFileSync("docs/architecture.svg", svg);
-console.log(`docs/architecture.svg — ${(svg.length / 1024).toFixed(1)} KB · ${1090}×${H}`);
+console.log(`docs/architecture.svg — ${(svg.length / 1024).toFixed(1)} KB · ${VW}×${H}`);

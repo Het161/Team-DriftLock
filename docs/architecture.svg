@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-330 -1410 1090 1900" width="1090" height="1900" font-family="ui-sans-serif,system-ui">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-370 -1455 1029 2010" width="1029" height="2010" font-family="ui-sans-serif,system-ui">
   <defs>
     <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#2743C7"/>
@@ -10,161 +10,161 @@
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#C63B21"/>
     </marker>
   </defs>
-  <rect x="-330" y="-1410" width="1090" height="1900" fill="#F6F5F1"/>
+  <rect x="-370" y="-1455" width="1029" height="2010" fill="#F6F5F1"/>
 
-  <text x="-306" y="-1354" font-family="ui-serif,Georgia,serif" font-size="30" fill="#1A1915">TAAR — the four planes</text>
-  <text x="-306" y="-1330" font-family="ui-monospace,monospace" font-size="10.5" letter-spacing="1.3" fill="#8A887F">THE DEPLOYMENT SERVES THE FEED. IT IS NOT WHAT FILLS IT.</text>
-
-  
-  <polygon points="-207.8,-1170.0 242.5,-910.0 242.5,-896.0 -207.8,-1156.0" fill="#D7D3C6"/>
-  <polygon points="450.3,-1030.0 242.5,-910.0 242.5,-896.0 450.3,-1016.0" fill="#EAE7DD"/>
-  <polygon points="0.0,-1290.0 450.3,-1030.0 242.5,-910.0 -207.8,-1170.0" fill="#FBFAF7" stroke="#E3E0D6" stroke-width="1.5"/>
-  
-  <text x="-306" y="-1196.0" font-family="ui-monospace,monospace" font-size="13" letter-spacing="1.6" fill="#2743C7">① TRIGGER</text>
-  <text x="-306" y="-1178.0" font-family="ui-sans-serif,system-ui" font-size="11.5" fill="#8A887F">two schedulers, both always on</text>
-  <line x1="-306" y1="-1172.0" x2="-221.8" y2="-1172.0" stroke="#E3E0D6" stroke-width="1.5"/>
-  
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,-41.57,-1240.00)">
-    <rect width="132" height="34" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">GitHub Actions</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">cron 9,39</text>
-  </g>
-  
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,110.85,-1152.00)">
-    <rect width="132" height="34" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">cron-job.org</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">every 30 min</text>
-  </g>
-  
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,263.27,-1064.00)">
-    <rect width="132" height="34" fill="#F6F5F1" stroke="#8A887F" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">either may stall</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">other covers ~20 min</text>
-  </g>
+  <text x="-344" y="-1389" font-family="ui-serif,Georgia,serif" font-size="38" fill="#1A1915">TAAR — the four planes</text>
+  <text x="-344" y="-1359" font-family="ui-monospace,monospace" font-size="13.5" letter-spacing="1.5" fill="#8A887F">THE DEPLOYMENT SERVES THE FEED. IT IS NOT WHAT FILLS IT.</text>
 
   
-  <line x1="-65.8" y1="-1118.0" x2="-65.8" y2="-709.0"
-        stroke="#2743C7" stroke-width="1.8" marker-end="url(#head)"/>
-  <text x="-56.8" y="-910.0"
-        font-family="ui-monospace,monospace" font-size="9.5" letter-spacing="0.4" fill="#2743C7">runs tick.ts on GitHub's own runner</text>
+  <polygon points="-129.9,-1215.0 459.0,-875.0 459.0,-859.0 -129.9,-1199.0" fill="#D7D3C6"/>
+  <polygon points="588.9,-950.0 459.0,-875.0 459.0,-859.0 588.9,-934.0" fill="#EAE7DD"/>
+  <polygon points="0.0,-1290.0 588.9,-950.0 459.0,-875.0 -129.9,-1215.0" fill="#FBFAF7" stroke="#E3E0D6" stroke-width="1.6"/>
   
-  <line x1="185.3" y1="-973.0" x2="185.3" y2="180.0"
-        stroke="#8A887F" stroke-width="1.8" marker-end="url(#headg)"/>
-  <text x="194.3" y="-775.8"
-        font-family="ui-monospace,monospace" font-size="9.5" letter-spacing="0.4" fill="#8A887F">POST + bearer</text>
-
+  <text x="-344" y="-1094.5" font-family="ui-monospace,monospace" font-size="19" letter-spacing="2" fill="#2743C7">① TRIGGER</text>
+  <text x="-344" y="-1070.5" font-family="ui-sans-serif,system-ui" font-size="14.5" fill="#8A887F">two schedulers, both always on</text>
+  <line x1="-344" y1="-1056.5" x2="-83.0" y2="-1056.5" stroke="#E3E0D6" stroke-width="1.6"/>
   
-  <polygon points="-207.8,-740.0 242.5,-480.0 242.5,-466.0 -207.8,-726.0" fill="#D7D3C6"/>
-  <polygon points="450.3,-600.0 242.5,-480.0 242.5,-466.0 450.3,-586.0" fill="#EAE7DD"/>
-  <polygon points="0.0,-860.0 450.3,-600.0 242.5,-480.0 -207.8,-740.0" fill="#FBFAF7" stroke="#E3E0D6" stroke-width="1.5"/>
-  
-  <text x="-306" y="-766.0" font-family="ui-monospace,monospace" font-size="13" letter-spacing="1.6" fill="#2743C7">② EXECUTION</text>
-  <text x="-306" y="-748.0" font-family="ui-sans-serif,system-ui" font-size="11.5" fill="#8A887F">lib/tick.ts — one cycle, from either trigger</text>
-  <line x1="-306" y1="-742.0" x2="-221.8" y2="-742.0" stroke="#E3E0D6" stroke-width="1.5"/>
-  
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,-41.57,-810.00)">
-    <rect width="132" height="34" fill="#F6F5F1" stroke="#2743C7" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">discover → judge → file</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">13 steps · 8 calls max</text>
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,-10.39,-1256.00)">
+    <rect width="170" height="50" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">GitHub Actions</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">cron 9,39 hourly</text>
   </g>
   
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,110.85,-722.00)">
-    <rect width="132" height="34" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">Mongo lease, 8 min</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">2nd arrival exits</text>
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,185.33,-1143.00)">
+    <rect width="170" height="50" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">cron-job.org</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">every 30 minutes</text>
   </g>
   
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,263.27,-634.00)">
-    <rect width="132" height="34" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">roster by lastRunAt</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">3 agents, rotating</text>
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,381.05,-1030.00)">
+    <rect width="170" height="50" fill="#F6F5F1" stroke="#8A887F" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">either may stall</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">other covers, ~20 min</text>
   </g>
 
   
-  <line x1="-86.6" y1="-700.0" x2="-86.6" y2="-291.0"
-        stroke="#2743C7" stroke-width="1.8" marker-end="url(#head)"/>
-  <text x="-77.6" y="-492.0"
-        font-family="ui-monospace,monospace" font-size="9.5" letter-spacing="0.4" fill="#2743C7">read + write</text>
+  <line x1="10.4" y1="-1150.0" x2="10.4" y2="-744.0"
+        stroke="#2743C7" stroke-width="2" marker-end="url(#head)"/>
+  <text x="22.4" y="-943.0"
+        font-family="ui-monospace,monospace" font-size="13" letter-spacing="0.5" fill="#2743C7">runs tick.ts on GitHub's runner</text>
   
-  <line x1="90.1" y1="-598.0" x2="90.1" y2="-189.0"
-        stroke="#8A887F" stroke-width="1.8" marker-end="url(#headg)"/>
-  <text x="99.1" y="-390.0"
-        font-family="ui-monospace,monospace" font-size="9.5" letter-spacing="0.4" fill="#8A887F">recall / remember</text>
-  
-  <line x1="237.3" y1="-513.0" x2="237.3" y2="-104.0"
-        stroke="#8A887F" stroke-width="1.8" marker-end="url(#headg)"/>
-  <text x="246.3" y="-305.0"
-        font-family="ui-monospace,monospace" font-size="9.5" letter-spacing="0.4" fill="#8A887F">fetch</text>
+  <line x1="365.5" y1="-945.0" x2="365.5" y2="321.0"
+        stroke="#8A887F" stroke-width="2" marker-end="url(#headg)"/>
+  <text x="377.5" y="-792.1"
+        font-family="ui-monospace,monospace" font-size="13" letter-spacing="0.5" fill="#8A887F">POST + bearer</text>
 
   
-  <polygon points="-207.8,-310.0 242.5,-50.0 242.5,-36.0 -207.8,-296.0" fill="#D7D3C6"/>
-  <polygon points="450.3,-170.0 242.5,-50.0 242.5,-36.0 450.3,-156.0" fill="#EAE7DD"/>
-  <polygon points="0.0,-430.0 450.3,-170.0 242.5,-50.0 -207.8,-310.0" fill="#FBFAF7" stroke="#E3E0D6" stroke-width="1.5"/>
+  <polygon points="-129.9,-785.0 459.0,-445.0 459.0,-429.0 -129.9,-769.0" fill="#D7D3C6"/>
+  <polygon points="588.9,-520.0 459.0,-445.0 459.0,-429.0 588.9,-504.0" fill="#EAE7DD"/>
+  <polygon points="0.0,-860.0 588.9,-520.0 459.0,-445.0 -129.9,-785.0" fill="#FBFAF7" stroke="#E3E0D6" stroke-width="1.6"/>
   
-  <text x="-306" y="-336.0" font-family="ui-monospace,monospace" font-size="13" letter-spacing="1.6" fill="#2743C7">③ STATE · MEMORY · SOURCES</text>
-  <text x="-306" y="-318.0" font-family="ui-sans-serif,system-ui" font-size="11.5" fill="#8A887F">what a cycle reads from and writes to</text>
-  <line x1="-306" y1="-312.0" x2="-221.8" y2="-312.0" stroke="#E3E0D6" stroke-width="1.5"/>
+  <text x="-344" y="-664.5" font-family="ui-monospace,monospace" font-size="19" letter-spacing="2" fill="#2743C7">② EXECUTION</text>
+  <text x="-344" y="-640.5" font-family="ui-sans-serif,system-ui" font-size="14.5" fill="#8A887F">lib/tick.ts — one cycle, from either trigger</text>
+  <line x1="-344" y1="-626.5" x2="-83.0" y2="-626.5" stroke="#E3E0D6" stroke-width="1.6"/>
   
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,-41.57,-380.00)">
-    <rect width="132" height="34" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">MongoDB Atlas M0</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">5 collections</text>
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,-10.39,-826.00)">
+    <rect width="170" height="50" fill="#F6F5F1" stroke="#2743C7" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">discover → judge</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">then file, or not</text>
   </g>
   
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,110.85,-292.00)">
-    <rect width="132" height="34" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">Breeth graph</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">scoped per agent</text>
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,185.33,-713.00)">
+    <rect width="170" height="50" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">Mongo lease, 8 min</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">second arrival exits</text>
   </g>
   
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,263.27,-204.00)">
-    <rect width="132" height="34" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">Groq 8b + 70b</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">Gemini in reserve</text>
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,381.05,-600.00)">
+    <rect width="170" height="50" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">roster by lastRunAt</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">3 agents, rotating</text>
   </g>
 
   
-  <line x1="-65.8" y1="-258.0" x2="-65.8" y2="151.0"
-        stroke="#2743C7" stroke-width="1.8" marker-end="url(#head)"/>
-  <text x="-56.8" y="-50.0"
-        font-family="ui-monospace,monospace" font-size="9.5" letter-spacing="0.4" fill="#2743C7">read-only projection</text>
+  <line x1="-12.1" y1="-733.0" x2="-12.1" y2="-327.0"
+        stroke="#2743C7" stroke-width="2" marker-end="url(#head)"/>
+  <text x="-0.1" y="-526.0"
+        font-family="ui-monospace,monospace" font-size="13" letter-spacing="0.5" fill="#2743C7">read + write</text>
+  
+  <line x1="183.6" y1="-620.0" x2="183.6" y2="-214.0"
+        stroke="#8A887F" stroke-width="2" marker-end="url(#headg)"/>
+  <text x="195.6" y="-413.0"
+        font-family="ui-monospace,monospace" font-size="13" letter-spacing="0.5" fill="#8A887F">recall / remember</text>
+  
+  <line x1="417.4" y1="-485.0" x2="417.4" y2="-79.0"
+        stroke="#8A887F" stroke-width="2" marker-end="url(#headg)"/>
+  <text x="429.4" y="-278.0"
+        font-family="ui-monospace,monospace" font-size="13" letter-spacing="0.5" fill="#8A887F">fetch</text>
 
   
-  <polygon points="-207.8,120.0 242.5,380.0 242.5,394.0 -207.8,134.0" fill="#D7D3C6"/>
-  <polygon points="450.3,260.0 242.5,380.0 242.5,394.0 450.3,274.0" fill="#EAE7DD"/>
-  <polygon points="0.0,0.0 450.3,260.0 242.5,380.0 -207.8,120.0" fill="#FBFAF7" stroke="#E3E0D6" stroke-width="1.5"/>
+  <polygon points="-129.9,-355.0 459.0,-15.0 459.0,1.0 -129.9,-339.0" fill="#D7D3C6"/>
+  <polygon points="588.9,-90.0 459.0,-15.0 459.0,1.0 588.9,-74.0" fill="#EAE7DD"/>
+  <polygon points="0.0,-430.0 588.9,-90.0 459.0,-15.0 -129.9,-355.0" fill="#FBFAF7" stroke="#E3E0D6" stroke-width="1.6"/>
   
-  <text x="-306" y="94.0" font-family="ui-monospace,monospace" font-size="13" letter-spacing="1.6" fill="#2743C7">④ SERVING</text>
-  <text x="-306" y="112.0" font-family="ui-sans-serif,system-ui" font-size="11.5" fill="#8A887F">Vercel Hobby — serves, never drives</text>
-  <line x1="-306" y1="118.0" x2="-221.8" y2="118.0" stroke="#E3E0D6" stroke-width="1.5"/>
+  <text x="-344" y="-234.5" font-family="ui-monospace,monospace" font-size="19" letter-spacing="2" fill="#2743C7">③ STATE</text>
+  <text x="-344" y="-210.5" font-family="ui-sans-serif,system-ui" font-size="14.5" fill="#8A887F">Mongo, memory, models and the four sources</text>
+  <line x1="-344" y1="-196.5" x2="-83.0" y2="-196.5" stroke="#E3E0D6" stroke-width="1.6"/>
   
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,-41.57,50.00)">
-    <rect width="132" height="34" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">POST /api/agent/init</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">persona → agentId</text>
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,-10.39,-396.00)">
+    <rect width="170" height="50" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">MongoDB Atlas M0</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">five collections</text>
   </g>
   
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,110.85,138.00)">
-    <rect width="132" height="34" fill="#F6F5F1" stroke="#2743C7" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">GET /api/agent/feed</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">five fields, forever</text>
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,185.33,-283.00)">
+    <rect width="170" height="50" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">Breeth graph</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">scoped per agent</text>
   </g>
   
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,263.27,226.00)">
-    <rect width="132" height="34" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.3" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">wire · newsroom</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">server components</text>
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,381.05,-170.00)">
+    <rect width="170" height="50" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">Groq 8b + 70b</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">Gemini in reserve</text>
   </g>
 
-  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,-294.45,-20.00)">
-    <rect width="140" height="34" fill="#F6F5F1" stroke="#C63B21" stroke-width="1.5" rx="2"/>
-    <text x="9" y="14" font-family="ui-sans-serif,system-ui" font-size="10.5" fill="#1A1915">Evaluator</text>
-    <text x="9" y="26" font-family="ui-monospace,monospace" font-size="8.5" fill="#8A887F">init once, then polls</text>
-  </g>
-  <line x1="-178.4" y1="59.0"
-        x2="-84.9" y2="67.0"
-        stroke="#C63B21" stroke-width="1.8" marker-end="url(#headr)"/>
+  
+  <line x1="10.4" y1="-290.0" x2="10.4" y2="116.0"
+        stroke="#2743C7" stroke-width="2" marker-end="url(#head)"/>
+  <text x="22.4" y="-83.0"
+        font-family="ui-monospace,monospace" font-size="13" letter-spacing="0.5" fill="#2743C7">read-only projection</text>
 
-  <text x="-306" y="428" font-family="ui-monospace,monospace" font-size="10.5" letter-spacing="0.8" fill="#8A887F">PLANE ① REACHES PLANE ③ BY TWO INDEPENDENT ROUTES — ONE THROUGH VERCEL, ONE AROUND IT.</text>
-  <text x="-306" y="446" font-family="ui-monospace,monospace" font-size="10.5" letter-spacing="0.8" fill="#8A887F">EITHER PROVIDER CAN BE DOWN AND THE WIRE KEEPS FILING.</text>
+  
+  <polygon points="-129.9,75.0 459.0,415.0 459.0,431.0 -129.9,91.0" fill="#D7D3C6"/>
+  <polygon points="588.9,340.0 459.0,415.0 459.0,431.0 588.9,356.0" fill="#EAE7DD"/>
+  <polygon points="0.0,0.0 588.9,340.0 459.0,415.0 -129.9,75.0" fill="#FBFAF7" stroke="#E3E0D6" stroke-width="1.6"/>
+  
+  <text x="-344" y="195.5" font-family="ui-monospace,monospace" font-size="19" letter-spacing="2" fill="#2743C7">④ SERVING</text>
+  <text x="-344" y="219.5" font-family="ui-sans-serif,system-ui" font-size="14.5" fill="#8A887F">Vercel Hobby — serves, never drives</text>
+  <line x1="-344" y1="233.5" x2="-83.0" y2="233.5" stroke="#E3E0D6" stroke-width="1.6"/>
+  
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,-10.39,34.00)">
+    <rect width="170" height="50" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">POST /api/agent/init</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">persona → agentId</text>
+  </g>
+  
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,185.33,147.00)">
+    <rect width="170" height="50" fill="#F6F5F1" stroke="#2743C7" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">GET /api/agent/feed</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">five fields, forever</text>
+  </g>
+  
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,381.05,260.00)">
+    <rect width="170" height="50" fill="#F6F5F1" stroke="#1A1915" stroke-width="1.6" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">wire · newsroom</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">server components</text>
+  </g>
+
+  <g transform="matrix(0.8660254037844387,0.5,-0.8660254037844387,0.5,-290.98,-64.00)">
+    <rect width="180" height="50" fill="#F6F5F1" stroke="#C63B21" stroke-width="1.8" rx="2"/>
+    <text x="14" y="21" font-family="ui-sans-serif,system-ui" font-size="16" fill="#1A1915">Evaluator</text>
+    <text x="14" y="39" font-family="ui-monospace,monospace" font-size="13" fill="#8A887F">init once, then polls</text>
+  </g>
+  <line x1="-133.4" y1="35.0"
+        x2="-46.8" y2="45.0"
+        stroke="#C63B21" stroke-width="2" marker-end="url(#headr)"/>
+
+  <text x="-344" y="481" font-family="ui-monospace,monospace" font-size="13" letter-spacing="1" fill="#8A887F">PLANE ① REACHES PLANE ③ BY TWO INDEPENDENT ROUTES — ONE THROUGH VERCEL, ONE AROUND IT.</text>
+  <text x="-344" y="505" font-family="ui-monospace,monospace" font-size="13" letter-spacing="1" fill="#8A887F">EITHER PROVIDER CAN BE DOWN AND THE WIRE KEEPS FILING.</text>
 </svg>

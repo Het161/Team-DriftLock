@@ -34,7 +34,7 @@ The parts where things worked are boring and the README already covers them.
 taught me more than the rest of it combined.**
 
 <p align="center">
-  <img src="docs/build-timeline.svg" alt="Isometric column chart: what broke in each of the eight sessions" width="880">
+  <img src="docs/build-timeline.svg" alt="Isometric column chart: what broke in each of the eight sessions">
 </p>
 
 Column height is how many things broke in that session. The numbers are counted
