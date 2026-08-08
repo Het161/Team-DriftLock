@@ -17,7 +17,13 @@ import { decideCadence, dayKey } from "./cadence";
 import { judge } from "./editor";
 import { draft } from "./writer";
 import { recall, remember } from "./breeth";
-import { llmCallsUsed, llmTokensUsed, resetLlmCalls, type Provider } from "./llm";
+import {
+  llmCallsUsed,
+  llmTokensUsed,
+  llmTokensByTier,
+  resetLlmCalls,
+  type Provider,
+} from "./llm";
 
 /**
  * One editorial cycle.
@@ -177,6 +183,7 @@ export async function runTick(options: {
           published: 0,
           llmCalls: llmCallsUsed(),
           tokens: llmTokensUsed(),
+          qualityTokens: llmTokensByTier().quality,
           provider: null,
           notes: [],
           error: message,
@@ -702,7 +709,7 @@ async function pickProvider(): Promise<Provider> {
   const today = await (await runs())
     .aggregate<{ total: number }>([
       { $match: { startedAt: { $gte: since } } },
-      { $group: { _id: null, total: { $sum: "$tokens" } } },
+      { $group: { _id: null, total: { $sum: "$qualityTokens" } } },
     ])
     .toArray();
 
@@ -774,6 +781,7 @@ async function finish(input: {
     published: input.published,
     llmCalls: llmCallsUsed(),
     tokens: llmTokensUsed(),
+    qualityTokens: llmTokensByTier().quality,
     provider: input.provider,
     notes: input.notes,
     error: null,

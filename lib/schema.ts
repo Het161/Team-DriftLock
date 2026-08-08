@@ -140,8 +140,10 @@ export type RunDoc = {
   spiked: number;
   published: number;
   llmCalls: number;
-  /** Total tokens across providers. Groq's daily cap is measured in these. */
+  /** Total tokens across providers and models, for the run log. */
   tokens?: number;
+  /** Tokens on the quality model only — the bucket the daily guard watches. */
+  qualityTokens?: number;
   provider: string | null;
   notes: string[];
   error: string | null;

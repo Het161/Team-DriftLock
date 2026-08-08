@@ -86,8 +86,22 @@ export type GenerateResult = {
  * is now read out of each response and totalled.
  */
 let tokensThisProcess = 0;
+/**
+ * Split by tier, because the two models have SEPARATE daily buckets.
+ *
+ * Summing them and comparing the total against the 70b's ceiling was wrong in
+ * the expensive direction: high-volume 8b gate traffic would push the counter
+ * past the threshold and shed load onto Gemini, whose free allowance here is
+ * twenty requests a day. The guard would have spent the emergency reserve to
+ * protect a budget that was never under pressure.
+ */
+const tokensByTier: Record<Tier, number> = { quality: 0, fast: 0 };
+
 export function llmTokensUsed(): number {
   return tokensThisProcess;
+}
+export function llmTokensByTier(): Record<Tier, number> {
+  return { ...tokensByTier };
 }
 
 export class LlmUnavailableError extends Error {
@@ -110,6 +124,8 @@ export function llmCallsUsed(): number {
 export function resetLlmCalls(): void {
   callsThisProcess = 0;
   tokensThisProcess = 0;
+  tokensByTier.quality = 0;
+  tokensByTier.fast = 0;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -249,7 +265,9 @@ async function callGroq(input: GenerateInput): Promise<string> {
     choices?: Array<{ message?: { content?: string } }>;
     usage?: { total_tokens?: number };
   };
-  tokensThisProcess += body.usage?.total_tokens ?? 0;
+  const used = body.usage?.total_tokens ?? 0;
+  tokensThisProcess += used;
+  tokensByTier[input.tier ?? "quality"] += used;
   return body.choices?.[0]?.message?.content ?? "";
 }
 
@@ -285,6 +303,8 @@ async function callGemini(input: GenerateInput): Promise<string> {
     }>;
     usageMetadata?: { totalTokenCount?: number };
   };
+  // Gemini is the emergency path and has its own tiny allowance; its usage is
+  // counted in the total but never against a Groq bucket.
   tokensThisProcess += body.usageMetadata?.totalTokenCount ?? 0;
 
   const candidate = body.candidates?.[0];
