@@ -7,6 +7,23 @@ to correct. This file is the audit trail — it is meant to be read alongside
 
 Format per entry: **Prompt → Produced → Corrected**.
 
+## Index
+
+| # | Phase | What was steered | What it caught or fixed | Commits |
+| --- | --- | --- | --- | --- |
+| [001](#001--project-brief-and-architecture-lock) | Brief & scaffold | Product, contract, locked architecture, design system; plan-then-build loop | Scaffold refused the folder name; Atlas URI pointed at another database; `.gitignore` swallowed `.env.example`; dark mode deleted rather than themed | `1759576`, `3486168` |
+| [002](#002--steps-13--deploy-database-and-the-contract) | Deploy + contract | Production-first: every gate asserted against the live URL, never localhost | **Vercel Auth would have hidden the product from the evaluator** — found by curling, not by opening a signed-in browser; the verifier would have poisoned the LLM budget with probe agents; the five-field rule made structural instead of careful | `2b02458`, `159964c`, `6595144` |
+| [003](#003--step-4--the-tick) | The tick | Discovery, editorial gate, writer, memory, both triggers, the run lock | **The spec's Gemini fallback was dead**; Breeth is a graph, so terse episodes are unrecallable (1 entity/0 edges → 8/6); a 48h window silently deleted arXiv; Google News links are unpublishable; the first desk was 5/8 the same story; **the first dispatch invented a publishing history** | `99cee10`, `356ba10`, `3680e65`, `d94828d` |
+| [004](#004--step-6--the-three-pages) | The three pages | Build order, screenshot at 390px + desktop, self-critique against tokens | Dateline rendered as the letter `T`, then lost its timestamp at 390px; the newsroom ran to 23,000px; **Breeth's metadata contradicts its own facts**, so it was cut; a CSS layering bug made the run log ALL CAPS; a `box-shadow` slipped into a shadow-free system | `1692a62`, `0214d89`, `5bbbb53`, `10ea522` |
+| [005](#005--phase-7-priorities-01--redundancy-and-proof) | Redundancy & proof | Two schedulers running permanently in parallel; keep the claims separate | **The pinger would have failed on every run** (30.6s work vs a 30s timeout) → 202 + `after()`; a GET would have 405'd; two deploys failed on lint because I checked with `tsc`, not `build`; **I reported a deploy failure that never happened**, and **called GitHub's scheduler dead when it was 19 minutes late** | `f279a2f`, `b4fffc1`, `fe6ba5a`, `302a0d7`, `c94b258`, `036ec86` |
+| [006](#006--the-overnight-silence) | The overnight silence | "check all things now" — every mechanical check green, product still failed | **A `hold` is not a refusal, but dedupe treated it as one.** The editor permanently burned its own candidate pool and went silent 9½ hours. Holds now return after a cooldown — and the very story it then filed was one it had held at 60 | `e434fdd`, `e346f07` |
+| [007](#007--the-second-agent-and-four-provider-failures-behind-it) | Second publication | Stand up a second editor; prove persona-agnosticism by voice | **The Gemini fallback had never worked** — pinned to `v1` off a probe that tested the wrong call; **tokens, not requests, were the ceiling**, and my "7× headroom" report was wrong; the cheap frequent task was starving the rare expensive one; a never-published agent could never be in "drought" | `5c0ebea`, `5a00e33`, `af333fe` |
+| [008](#008--lockdown--secrets-the-last-two-tests-and-the-budget) | Lockdown | Secrets, last two tests, measured budget, then **freeze** | Secret audit clean across all history; the hygiene scan couldn't see Markdown — the file most likely to leak; **the rotation list was missing the database password**; charter recovery proven both halves; the budget guard I'd just added watched the wrong bucket | `700b6a8`, `2fd89eb`, `0b83c4b`, `5ab4233`, `20fa139` |
+
+**If you read one thing:** [006](#006--the-overnight-silence) — a failure where
+every check was green, nothing had crashed, and the system was working exactly
+as written. What was written was wrong.
+
 ---
 
 ## 001 · Project brief and architecture lock
@@ -567,3 +584,71 @@ A quality-tier call that exhausts both the good model and the fallback now drops
 to the fast model rather than failing. On a free tier the honest choice is a
 dispatch written by a smaller model over a wire that goes dark, and the run log
 records which model wrote each one.
+
+---
+
+## 008 · Lockdown — secrets, the last two tests, and the budget
+
+**Date:** 2026-08-08
+**Tool:** Claude Code (Opus 5) in VS Code
+
+### Prompt
+
+Phase 8: make it submission-proof. Audit for leaked credentials, prove the one
+untested designed behaviour, measure the operating budget, then **freeze the
+pipeline** and let it run unattended.
+
+> "Work top to bottom. The code window closes at the end of Priority 2 — after
+> that, `lib/` and the pipeline are FROZEN except for a genuine production-down
+> emergency."
+
+### Produced
+
+A clean secret audit, a preflight that scans for credentials, `docs/rotation.md`,
+the charter-recovery path proven live, a bounded canonical-source preference, a
+measured operating budget in the README, and a code freeze at `5ab4233`.
+
+### Corrected
+
+- **The secret audit came back clean, which was worth proving rather than
+  assuming.** No credential appears in any tracked file or anywhere in
+  `git log -p --all`; `.env.local` was never tracked. That mattered for more
+  than tidiness — a leak would have forced a history rewrite, and Stage 2
+  audits commit authenticity. Rotation, not rewriting, is the remedy for
+  material exposed in transcripts.
+- **The existing hygiene scan could not see the file most likely to leak.** It
+  filtered to code extensions and skipped Markdown entirely — and `PROMPTS.md`
+  is a required *public* deliverable that quotes freely from working sessions.
+  The new scan is driven by `git ls-files`, and it looks for the current
+  `CRON_SECRET` by reading it from the environment rather than writing the
+  literal into the repository, which would have put the secret into the very
+  check meant to keep it out.
+- **The rotation list was missing the most dangerous credential.** `MONGODB_URI`
+  carries the database password and was handled in the same sessions. It is not
+  an API key with a spend limit; it is read/write access to production,
+  including the ability to delete the evaluator's agent and every dispatch. It
+  is also the easiest to overlook, because it never appears in a mental list of
+  "which API keys do I have".
+- **The charter-recovery path was proven, both halves.** Init survived a forced
+  failure with `200 {agentId}` in 5.1s and the agent persisted as `pending`;
+  the next tick built the charter and the agent went on to judge a desk. In the
+  same run the `lastRunAt` fairness ordering was observed working by accident —
+  the probe consumed the cycle budget and the other two agents were cleanly
+  skipped with "this agent runs next cycle" rather than starved.
+- **The budget guard added that morning was itself wrong.** It summed tokens
+  across both models and compared the total to the 70b's 100k/day cap. The two
+  models have separate buckets, so high-volume 8b gate traffic would have
+  tripped the switch and shed load onto Gemini's twenty-requests-a-day
+  emergency reserve — spending the reserve to protect a budget under no
+  pressure. Now tracked per tier.
+- **The measured budget missed its own target and was reported rather than
+  quietly tuned.** At four agents the gate bucket showed 1.8x headroom against
+  a 3x bar. The smallest fix turned out to need no code at all — halving the
+  external pinger's frequency reaches 3.0x — so the freeze stayed clean and the
+  decision went back to the human.
+- **Canonical-source preference was kept deliberately small.** Merged clusters
+  now promote the publisher over a syndication shell, but 29 of 51 candidates
+  on a live pass are aggregator singletons with no sibling to swap to. Fixing
+  those means dropping or rewriting candidates — editorial semantics rather
+  than link hygiene — so it was left alone and written down instead.
+
