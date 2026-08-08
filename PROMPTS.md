@@ -33,6 +33,19 @@ The parts where things worked are boring and the README already covers them.
 **47 commits. 8 sessions. 2 live editors. 1 nine-and-a-half-hour outage that
 taught me more than the rest of it combined.**
 
+<p align="center">
+  <img src="docs/build-timeline.svg" alt="Isometric column chart: what broke in each of the eight sessions" width="880">
+</p>
+
+Column height is how many things broke in that session. The numbers are counted
+out of this file by [scripts/gen-timeline.mjs](scripts/gen-timeline.mjs), not
+typed in, so the chart can't drift away from the log it illustrates.
+
+Session 008 is the tallest because lockdown is where you go looking for
+problems. Session 006 is short and red for the opposite reason: only four
+things were wrong, and one of them had already taken the wire off the air for
+nine and a half hours while every check reported green.
+
 ---
 
 ## Index
