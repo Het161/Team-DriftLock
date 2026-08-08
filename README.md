@@ -74,28 +74,37 @@ The deployment serves the feed. **It is not what fills it.**
 
 ```mermaid
 flowchart LR
-  subgraph GH["GitHub Actions · cron 9,39 * * * *"]
-    T["scripts/tick.ts"]
+  subgraph SCHED["Two schedulers, running in parallel"]
+    GHA["GitHub Actions<br>cron 9,39 past the hour"]
+    PING["cron-job.org<br>every 30 min, offset"]
   end
-  subgraph V["Vercel Hobby"]
-    API["/api/agent/init<br>/api/agent/feed<br>/api/agent/tick"]
+
+  subgraph V["Vercel Hobby — serves, does not drive"]
+    API["POST /api/agent/init<br>GET /api/agent/feed<br>POST /api/agent/tick"]
     UI["front page · wire · newsroom"]
   end
-  DB[("MongoDB Atlas M0<br>agents · posts<br>rejections · runs · locks")]
-  LLM["Groq llama-3.3-70b<br>↓ fallback<br>Gemini 2.5 Flash"]
+
+  TICK["the cycle — lib/tick.ts<br>discover → judge → file"]
+  DB[("MongoDB Atlas M0<br>agents · posts · rejections<br>runs · locks")]
+  LLM["Groq 8b — judging<br>Groq 70b — drafting<br>Gemini 2.5 Flash — emergency"]
   MEM["Breeth<br>knowledge graph"]
   SRC["Hacker News · arXiv<br>Google News · Bing News"]
+  EV(["Evaluator"])
 
-  T -->|lease| DB
-  T --> SRC
-  T --> LLM
-  T <--> MEM
-  T -->|insert dispatch| DB
+  GHA -->|runs scripts/tick.ts<br>on its own runner| TICK
+  PING -->|POST, bearer token| API
+  API -->|same cycle, in Vercel| TICK
+
+  TICK -->|takes a lease first| DB
+  TICK --> SRC
+  TICK --> LLM
+  TICK <--> MEM
+
+  EV --> API
   API --> DB
   UI --> DB
-  API -.->|backup trigger| T
-  EV(["Evaluator"]) --> API
 ```
+
 
 **Why GitHub Actions.** Vercel Hobby's cron allows only once-a-day schedules, so
 it cannot drive a 30-minute cadence. A long-running server has no free tier
@@ -111,11 +120,17 @@ whichever arrives second exits without doing anything. This is tested, not
 assumed: two ticks fired simultaneously produced one publish and one
 `lease held by another run`.
 
-**Why the cadence is slower than the cycle.** The tick runs every 30 minutes;
-the editor publishes 3–5 times a day. Most cycles are deliberately quiet — it
-still discovers and still spikes, it just doesn't file. A wire that published
-every 30 minutes would exhaust the free LLM budget by mid-morning and read like
-a scraper rather than a correspondent.
+Note what the arrows say: Actions runs the cycle **on its own runner**, talking
+straight to Mongo with Vercel nowhere in the path. The pinger instead calls
+Vercel, which runs the same cycle there. So the two lines are redundant at the
+*execution* layer too — a Vercel outage does not stop the wire, and a GitHub
+outage does not either.
+
+**Why the cadence is slower than the cycle.** The two schedulers are offset, so
+a cycle runs roughly every 15–20 minutes; the editor publishes 3 times a day.
+Most cycles are deliberately quiet — it still discovers and still spikes, it
+just does not file. A wire that published every cycle would exhaust the free LLM
+budget before lunch and read like a scraper rather than a correspondent.
 
 ---
 
@@ -216,6 +231,36 @@ last dispatch. Window is open."* before filing. And it filed from **arXiv**, the
 source that a blanket 48-hour freshness window and a shared 10-second fetch
 budget had each silently removed from the wire earlier in the build. Had those
 not been fixed, this dispatch would not exist.
+
+---
+
+## What live probing corrected
+
+Nearly every important decision in TAAR came from calling the real API and
+reading what came back, not from reading documentation. A representative list,
+each of which would have shipped as a silent defect:
+
+| Assumption | What probing found |
+| --- | --- |
+| The spec's Gemini fallback works | `gemini-2.0-flash` returns `429 limit: 0` on this key. Found before writing a line of the LLM layer. |
+| Breeth is a document store | It is a knowledge graph. A terse episode produced **1 entity and 0 edges** and was unrecallable; the same facts as full sentences naming the agent produced **8 and 6**. This rewrote the memory layer. |
+| News is news | Google News RSS emits opaque redirects that resolve only via in-page JavaScript — poor things to publish as sources. Bing News wraps the real publisher URL in a query parameter, so it was added alongside. |
+| A 48-hour freshness window is fine | It silently deleted arXiv from the wire: for a niche query the newest matching preprint is routinely 4–5 days old. Freshness is now per-source. |
+| One fetch budget fits all adapters | arXiv answered in **15.8s** cold against a shared 10s budget — the wire was discarding research and logging it as a timeout. |
+| `x-ratelimit-remaining-requests` shows the budget | It read **998/1000** while the account was at **96.7k of 100k daily tokens**. Groq's real ceiling is tokens per day and appears only inside the body of the 429. |
+| The fallback is tested | It had **never worked**. It was pinned to Gemini's `v1` path on the strength of a probe that sent neither a system instruction nor JSON mode — and `v1` rejects both. It passed a test it could only fail in production. |
+| Reasoning models are free to leave on | Gemini 2.5 Flash spent **823 tokens thinking to produce 441 of answer**, and truncated the editorial gate's JSON mid-object. Disabled: 60% cheaper and structurally unable to run out mid-object. |
+
+Two of these were corrections to **our own earlier reports**, not to the spec:
+the `v1` choice came from a probe that tested the wrong shape of call, and the
+"comfortable headroom" claim came from reading the wrong meter. Both are logged
+in [PROMPTS.md](PROMPTS.md) rather than quietly fixed.
+
+The same discipline caught the product's worst failure. Every mechanical check
+was green — 10/10 Actions runs, both schedulers alive, zero errors — while the
+wire had been silent for nine and a half hours, because a `hold` verdict was
+being treated as a permanent refusal and the editor was burning its own
+candidate pool. Nothing had crashed. It was working exactly as written.
 
 ---
 
@@ -339,12 +384,26 @@ npm run verify                       # against NEXT_PUBLIC_APP_URL
 npm run verify -- --agent <agentId>  # also shape-checks a populated feed
 ```
 
-34 assertions: the init happy path · six malformed-init bodies · missing and
+38 assertions: the init happy path · six malformed-init bodies · missing and
 unknown `agentId` · the exact `{"posts":[]}` body · the five-field shape ·
 unique ids · round-tripping ISO-8601 Z timestamps · reverse-chronological
 ordering · source URL validity · `no-store` on the feed · and, across runs via a
-local baseline, that posts returned once are still returned later. It creates a
+local baseline, that posts returned once are still returned later; plus a
+liveness warning if either scheduler has not run in two hours. It creates a
 probe agent each run and deletes it afterwards.
+
+[scripts/preflight.ts](scripts/preflight.ts) answers a different question — not
+"is the integration correct" but "is this shippable":
+
+```bash
+npm run preflight
+```
+
+Routes, the empty-feed contract, both schedulers alive, required files present,
+no scaffolding or localhost URLs left in the tree, and **no credential patterns
+in any tracked file** — including Markdown, since [PROMPTS.md](PROMPTS.md) is a
+public deliverable that quotes working sessions. It ends by printing the
+checklist a script cannot verify, such as whether the repo is actually public.
 
 ---
 
