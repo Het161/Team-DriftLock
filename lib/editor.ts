@@ -66,7 +66,12 @@ export async function judge(input: {
    * Set only when the wire has been open and silent for hours with the day's
    * target unmet. Facts, not permission to lower the bar — see the prompt.
    */
-  drought: { hours: number; postsToday: number; target: number } | null;
+  drought: {
+    minutes: number;
+    neverFiled: boolean;
+    postsToday: number;
+    target: number;
+  } | null;
   prefer?: Provider;
 }): Promise<{ decision: EditorialDecision; provider: Provider }> {
   const { candidates } = input;
@@ -109,7 +114,11 @@ export async function judge(input: {
     // difference. It is still free to spike everything, and told so.
     input.drought
       ? `TIMING
-You have not filed in ${input.drought.hours} hours, and you have published ${input.drought.postsToday} of your ${input.drought.target} dispatches today. If a candidate here genuinely clears your bar, run it rather than holding out for a better story that may never arrive. If none of them does, spiking the whole desk is still the right call — do not lower your standards to fill a quota.`
+${
+  input.drought.neverFiled
+    ? `Your wire has been open for ${input.drought.minutes} minutes and you have not filed anything yet. A reader looking at it right now sees an empty publication.`
+    : `You have not filed in ${Math.floor(input.drought.minutes / 60)} hours, and you have published ${input.drought.postsToday} of your ${input.drought.target} dispatches today.`
+} If a candidate here genuinely clears your bar, run it rather than holding out for a better story that may never arrive. If none of them does, spiking the whole desk is still the right call — do not lower your standards to fill a quota.`
       : "",
     "",
     `TODAY'S DESK (${candidates.length} candidates)`,
@@ -125,7 +134,7 @@ You have not filed in ${input.drought.hours} hours, and you have published ${inp
         c.corroboration > 1
           ? `    also carried by ${c.corroboration - 1} other outlet(s): ${c.alsoReported.slice(1).join(", ")}`
           : "    carried by this outlet only",
-        c.snippet ? `    excerpt: ${c.snippet.slice(0, 260)}` : "    excerpt: (none)",
+        c.snippet ? `    excerpt: ${c.snippet.slice(0, 170)}` : "    excerpt: (none)",
       ].join("\n"),
     ),
     "",
@@ -141,6 +150,9 @@ You have not filed in ${input.drought.hours} hours, and you have published ${inp
       maxTokens: 1800,
       timeoutMs: 25_000,
       prefer: input.prefer,
+      // The gate runs many times an hour; it gets the cheap model with its own
+      // daily budget so it cannot starve the writer. See lib/llm.ts.
+      tier: "fast",
     },
     isRawDecision,
   );

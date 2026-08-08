@@ -17,7 +17,7 @@ import { decideCadence, dayKey } from "./cadence";
 import { judge } from "./editor";
 import { draft } from "./writer";
 import { recall, remember } from "./breeth";
-import { llmCallsUsed, resetLlmCalls, type Provider } from "./llm";
+import { llmCallsUsed, llmTokensUsed, resetLlmCalls, type Provider } from "./llm";
 
 /**
  * One editorial cycle.
@@ -31,12 +31,29 @@ import { llmCallsUsed, resetLlmCalls, type Provider } from "./llm";
 
 /** Ceiling per cycle, per the free-tier budget. */
 const MAX_LLM_CALLS_PER_TICK = 8;
-/** Beyond this many Groq calls today, prefer the fallback provider. */
-const DAILY_GROQ_SOFT_LIMIT = 800;
+/**
+ * Beyond this many tokens today, prefer the fallback provider.
+ *
+ * Groq's free tier caps llama-3.3-70b at 100,000 tokens per day. That limit is
+ * invisible in the response headers — the request counter read 998/1000 while
+ * the account was at 96.7k tokens and about to start failing. 80k leaves room
+ * for the cycle in flight to finish on Groq rather than dying mid-dispatch.
+ */
+const DAILY_GROQ_TOKEN_LIMIT = 80_000;
 /** Agents handled in one cycle. Anything beyond waits for the next. */
 const MAX_AGENTS_PER_TICK = 3;
-/** Candidates the editorial gate actually reads. */
-const DESK_SIZE = 8;
+/** Candidates the editorial gate actually reads. Each one costs prompt tokens. */
+const DESK_SIZE = 6;
+/**
+ * On a cycle that cannot publish anyway, judge at most this often.
+ *
+ * Running the gate every cycle was the right instinct — editorial life
+ * continues, and the spike log is a judged artifact — but at six cycles an hour
+ * across multiple agents it is also where the entire daily token budget goes.
+ * The wire still spikes steadily; it just does not re-judge the same desk four
+ * times an hour to prove it.
+ */
+const QUIET_JUDGE_INTERVAL_MS = 60 * 60 * 1000;
 /** Below this many fresh candidates, widen the search before giving up. */
 const MIN_DESK = 4;
 /** How long a held story stays off the desk before it may be reconsidered. */
@@ -159,6 +176,7 @@ export async function runTick(options: {
           spiked: 0,
           published: 0,
           llmCalls: llmCallsUsed(),
+          tokens: llmTokensUsed(),
           provider: null,
           notes: [],
           error: message,
@@ -317,27 +335,72 @@ async function tickAgent(
     );
   }
 
-  /* 6 — the editorial gate. */
+  /* 6 — the editorial gate, budget permitting. */
+  //
+  // Skipped only when we could not publish this cycle anyway AND the desk was
+  // judged recently. When the window is open the gate always runs: that is the
+  // cycle that can actually file, and it must never be the one we economised on.
+  const lastJudged = agent.lastJudgedAt ? new Date(agent.lastJudgedAt).getTime() : 0;
+  const judgedRecently = Date.now() - lastJudged < QUIET_JUDGE_INTERVAL_MS;
+
+  if (!cadence.mayPublish && judgedRecently) {
+    return finish({
+      runId,
+      agent,
+      trigger,
+      startedAt,
+      outcome: "quiet",
+      candidatesFound: totalFound,
+      candidatesAfterDedupe: fresh.length,
+      spiked: 0,
+      published: 0,
+      postId: null,
+      provider,
+      notes: [...notes, `Outside the window and judged recently; saving the budget.`],
+    });
+  }
+
   //
   // A drought is only reported when the wire is actually open and behind: the
   // gate has already said we may publish, it has been hours, and the day's
   // target is unmet. In normal operation this is null and the editor never
   // hears about timing at all.
+  // The idle clock runs from the last dispatch, or from creation for an agent
+  // that has never filed. Keying it on lastPostAt alone meant a brand-new agent
+  // could never be in drought at all — the nudge skipped precisely the agent
+  // that most needs to publish, the evaluator's, minutes after they created it.
+  //
+  // A new agent also gets a far shorter fuse. Four hours of silence is a lull
+  // for an established wire; on a feed the evaluator just opened it is the
+  // entire first impression.
   const DROUGHT_AFTER_MIN = 240;
-  const minutesIdle = cadence.minutesSinceLastPost;
+  const NEW_AGENT_DROUGHT_AFTER_MIN = 25;
+
+  const neverFiled = agent.lastPostAt === null;
+  const idleSince = agent.lastPostAt ?? agent.createdAt;
+  const minutesIdle = (startedAt.getTime() - new Date(idleSince).getTime()) / 60_000;
+  const droughtAfter = neverFiled ? NEW_AGENT_DROUGHT_AFTER_MIN : DROUGHT_AFTER_MIN;
+
   const drought =
     cadence.mayPublish &&
-    minutesIdle !== null &&
-    minutesIdle >= DROUGHT_AFTER_MIN &&
+    Number.isFinite(minutesIdle) &&
+    minutesIdle >= droughtAfter &&
     postsToday < charter.cadence.postsPerDay
       ? {
-          hours: Math.floor(minutesIdle / 60),
+          minutes: Math.round(minutesIdle),
+          neverFiled,
           postsToday,
           target: charter.cadence.postsPerDay,
         }
       : null;
 
-  if (drought) notes.push(`Drought: ${drought.hours}h idle, ${drought.postsToday}/${drought.target} filed today.`);
+  if (drought) {
+    notes.push(
+      drought.neverFiled
+        ? `Drought: nothing filed yet, ${drought.minutes} min since initialization.`
+        : `Drought: ${Math.floor(drought.minutes / 60)}h idle, ${drought.postsToday}/${drought.target} filed today.`,
+    );
+  }
 
   const { decision, provider: judgeProvider } = await judge({
     persona: agent.persona,
@@ -349,6 +412,11 @@ async function tickAgent(
     prefer,
   });
   provider = judgeProvider;
+
+  await (await agents()).updateOne(
+    { agentId: agent.agentId },
+    { $set: { lastJudgedAt: new Date().toISOString() } },
+  );
 
   /* 7 — every refusal is recorded, published or not. */
   const refused = decision.verdicts.filter(
@@ -634,12 +702,12 @@ async function pickProvider(): Promise<Provider> {
   const today = await (await runs())
     .aggregate<{ total: number }>([
       { $match: { startedAt: { $gte: since } } },
-      { $group: { _id: null, total: { $sum: "$llmCalls" } } },
+      { $group: { _id: null, total: { $sum: "$tokens" } } },
     ])
     .toArray();
 
   const used = today[0]?.total ?? 0;
-  return used >= DAILY_GROQ_SOFT_LIMIT ? "gemini" : "groq";
+  return used >= DAILY_GROQ_TOKEN_LIMIT ? "gemini" : "groq";
 }
 
 function firstSentences(text: string, count: number): string {
@@ -705,6 +773,7 @@ async function finish(input: {
     spiked: input.spiked,
     published: input.published,
     llmCalls: llmCallsUsed(),
+    tokens: llmTokensUsed(),
     provider: input.provider,
     notes: input.notes,
     error: null,

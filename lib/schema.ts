@@ -81,6 +81,8 @@ export type AgentDoc = {
    * per-cycle cap, enough such agents lock the healthy ones out entirely.
    */
   lastRunAt?: string | null;
+  /** Last cycle that actually spent an editorial-gate call. See the token diet. */
+  lastJudgedAt?: string | null;
   postCount: number;
 };
 
@@ -138,6 +140,8 @@ export type RunDoc = {
   spiked: number;
   published: number;
   llmCalls: number;
+  /** Total tokens across providers. Groq's daily cap is measured in these. */
+  tokens?: number;
   provider: string | null;
   notes: string[];
   error: string | null;
