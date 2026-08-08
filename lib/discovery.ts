@@ -89,6 +89,31 @@ const DEDUPE_PRECEDENCE: Record<SourceKey, number> = {
   googlenews: 3, // opaque redirect; kept only for coverage
 };
 
+/**
+ * Hosts that republish someone else's reporting.
+ *
+ * Used only to choose which member of an already-merged cluster represents it.
+ * A reader clicking a source should land on the outlet that did the work, not
+ * on a syndication shell — the first Indus dispatch cited msn.com for a story
+ * the publisher had run themselves.
+ */
+const AGGREGATOR_HOSTS = [
+  "msn.com",
+  "news.google.com",
+  "news.yahoo.com",
+  "flipboard.com",
+  "smartnews.com",
+];
+
+function isAggregator(url: string): boolean {
+  try {
+    const host = new URL(url).host.replace(/^www\./, "");
+    return AGGREGATOR_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
+}
+
 const UA = "TAAR/1.0 (autonomous wire service; https://github.com/Het161/taar)";
 
 /* -------------------------------------------------------------------------- */
@@ -201,6 +226,16 @@ function cluster(candidates: Candidate[]): Candidate[] {
       match.candidate.corroboration++;
       if (!match.candidate.alsoReported.includes(c.sourceLabel)) {
         match.candidate.alsoReported.push(c.sourceLabel);
+      }
+
+      // Promote a canonical publisher over a syndication shell. Only the
+      // representative link changes — the cluster, its count and its ordering
+      // are untouched, so this cannot alter what the editor is offered or how
+      // it ranks anything. It only changes where a reader lands.
+      if (isAggregator(match.candidate.url) && !isAggregator(c.url)) {
+        match.candidate.url = c.url;
+        match.candidate.sourceLabel = c.sourceLabel;
+        match.candidate.snippet = c.snippet || match.candidate.snippet;
       }
       continue;
     }
