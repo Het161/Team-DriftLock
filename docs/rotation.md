@@ -1,21 +1,32 @@
 # Credential rotation runbook
 
-**Run this Sunday at ~15:00 IST (09:30 UTC), before submitting at 18:00 IST.**
+**Deferred until after judging closes. Not run before submission — see below.**
 
-## Why
+## Why it was written, and why it was deferred
 
-`PROMPTS.md` is a required *public* deliverable, and the working sessions behind
-it handled live credentials in plain text. Every secret currently in use must be
-treated as compromised the moment those materials become public.
+This runbook was written on the assumption that publishing `PROMPTS.md` would
+expose the credentials handled while building it, which would make rotation
+mandatory before anything public went out.
 
-Two constraints set the timing:
+That assumption was checked rather than acted on. `PROMPTS.md` is a curated build
+log, not a transcript, and a scan of **all 57 commits across every branch** finds
+no Groq, Gemini, Breeth, or Atlas credential in the repository's history. The
+only match is the literal `user:pass@cluster.mongodb.net` placeholder in
+`.env.example`, which is a template. `npm run preflight` re-checks every tracked
+file for all five secrets on every run and has never flagged one.
 
-- **Old keys must be dead before anything public goes out.**
-- **New keys must be proven working before we submit**, because judging traffic
-  starts after the deadline, when nobody is watching. A rotation that silently
-  breaks the wire at 18:00 is worse than no rotation at all.
+So the exposure the runbook was written against does not exist, and rotating
+against the deadline carries a real cost that the exposure does not. Five
+secrets live in **two** places — Vercel and GitHub Actions. Rotate one and miss
+the other and the wire stops filing during judging, unattended, with every
+health check still green. That is the exact failure mode of sessions 006 and
+009, and it is a poor thing to introduce deliberately on submission day.
 
-Doing it three hours before submission leaves room to notice and fix a mistake.
+**The steps below are correct and still apply.** Run them once judging closes,
+then confirm a full cycle publishes before walking away.
+
+- **New keys must be proven working before the old ones are revoked**, because a
+  rotation that silently breaks the wire is worse than no rotation at all.
 
 ## ⚠️ The database password is on this list
 
