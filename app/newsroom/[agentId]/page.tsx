@@ -15,7 +15,8 @@ import {
 } from "@/lib/queries";
 import { ago } from "@/lib/format";
 
-export const dynamic = "force-dynamic";
+/** Ten seconds, for the same reason as the wire page. */
+export const revalidate = 10;
 
 type Props = { params: Promise<{ agentId: string }> };
 
