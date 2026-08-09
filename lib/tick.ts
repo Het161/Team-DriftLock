@@ -11,7 +11,7 @@ import {
   type RunDoc,
 } from "./schema";
 import { acquireLease, releaseLease } from "./lock";
-import { discover, normaliseTitle, normaliseUrl, type Candidate } from "./discovery";
+import { discover, isAggregator, normaliseTitle, normaliseUrl, type Candidate } from "./discovery";
 import { buildCharter } from "./charter";
 import { decideCadence, dayKey } from "./cadence";
 import { judge } from "./editor";
@@ -315,7 +315,7 @@ async function tickAgent(
   }
 
   /* 5 — what does the editor already think, and what has it actually filed? */
-  const desk = fresh.slice(0, DESK_SIZE);
+  const desk = buildDesk(fresh);
 
   const memoryQuery = `${agent.persona.domain}: ${desk.map((c) => c.title).join("; ")}`;
 
@@ -555,6 +555,60 @@ async function tickAgent(
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                     */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Chooses which candidates get judged, rather than taking whichever six the
+ * adapters happened to return first.
+ *
+ * The desk used to be `fresh.slice(0, DESK_SIZE)`. Reading back 177 scored
+ * judgements showed what that cost: syndicated reprints — msn.com, the Yahoo
+ * finance shells — were about a third of every desk and averaged 25 against a
+ * bar they never once cleared, while arXiv averaged 46 and 37 and supplied
+ * three of the first eight dispatches. Arrival order was spending the desk's
+ * six slots on the material least likely to be worth publishing, and a spike is
+ * permanent, so each wasted slot also burned a candidate for good.
+ *
+ * The weights below are read off those judgements, not guessed. They order the
+ * desk; they do not decide anything — the editor still judges every candidate
+ * on the merits and remains free to spike all six.
+ */
+function deskScore(c: Candidate): number {
+  let score = 0;
+
+  // The one thing the judgement history supports without qualification:
+  // syndicated reprints averaged 25 across 177 scored candidates and never once
+  // cleared the bar. A source-class bonus for arXiv was tried and dropped — that
+  // prior came from a period when arXiv only ever returned exact-phrase matches,
+  // and it does not survive the broader query now that the adapter works.
+  if (isAggregator(c.url)) score -= 2;
+  if (c.corroboration > 1) score += 1; // several outlets carried it independently
+  if ((c.snippet ?? "").length >= 120) score += 1; // enough text to judge substance on
+
+  return score;
+}
+
+/**
+ * Ranked, but capped at three candidates from any one source. A desk of six
+ * preprints is an arXiv digest, not a wire; the cap keeps research and reporting
+ * both represented whatever the ranking says.
+ */
+function buildDesk(fresh: Candidate[]): Candidate[] {
+  const ranked = [...fresh].sort((a, b) => deskScore(b) - deskScore(a));
+  const perSource = new Map<string, number>();
+  const desk: Candidate[] = [];
+
+  for (const pass of [true, false]) {
+    for (const c of ranked) {
+      if (desk.length >= DESK_SIZE || desk.includes(c)) continue;
+      const used = perSource.get(c.source) ?? 0;
+      if (pass && used >= 3) continue; // first pass respects the cap
+      perSource.set(c.source, used + 1);
+      desk.push(c);
+    }
+  }
+
+  return desk;
+}
 
 /**
  * Drops candidates this agent has already published or spiked.

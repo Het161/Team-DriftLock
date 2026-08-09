@@ -50,13 +50,24 @@ function section(t: string) {
   console.log(`\n${C.bold}${t}${C.reset}`);
 }
 
+/**
+ * `indexOf` returns -1 for a missing flag, and argv[-1 + 1] is the node binary
+ * path — so a bare `npm run preflight` used to probe /wire//opt/homebrew/... and
+ * fail two checks on a URL nobody asked for. Read the flag only when it is there.
+ */
+function flag(name: string): string | undefined {
+  const i = process.argv.indexOf(name);
+  return i === -1 ? undefined : process.argv[i + 1];
+}
+
 const BASE = (
-  process.argv.includes("--url")
-    ? process.argv[process.argv.indexOf("--url") + 1]
-    : (process.env.TAAR_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "")
+  flag("--url") ??
+  process.env.TAAR_URL ??
+  process.env.NEXT_PUBLIC_APP_URL ??
+  ""
 ).replace(/\/$/, "");
 
-const DEMO_AGENT = process.env.TAAR_DEMO_AGENT ?? process.argv[process.argv.indexOf("--agent") + 1];
+const DEMO_AGENT = process.env.TAAR_DEMO_AGENT ?? flag("--agent");
 
 async function main() {
   console.log(`\n${C.bold}TAAR submission preflight${C.reset}`);

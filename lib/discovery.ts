@@ -113,7 +113,7 @@ const AGGREGATOR_HOSTS = [
   "smartnews.com",
 ];
 
-function isAggregator(url: string): boolean {
+export function isAggregator(url: string): boolean {
   try {
     const host = new URL(url).host.replace(/^www\./, "");
     return AGGREGATOR_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
@@ -382,13 +382,82 @@ async function fromArxiv(keywords: string[]): Promise<Candidate[]> {
   return batches.flat();
 }
 
+/**
+ * Subject classes this wire covers. arXiv tags every paper with its own, which
+ * is a far steadier relevance signal than anything derivable from the keyword.
+ *
+ * The broad AND query restores arXiv's supply but pays for it in precision:
+ * searching the terms of "AI-Specific Chip Architectures" returned a paper on
+ * X-ray CCDs and one on a block cipher, and "AI and data privacy" returned
+ * sparse PCA via wavelets. Every one of those matches the words. None of them
+ * is computer science as this wire means it.
+ *
+ * Two narrower filters were tried and measured first. Requiring the keyword's
+ * two-word core to appear intact cut arXiv from fifteen candidates to one —
+ * straight back to the silence being fixed. Scoring candidates against the
+ * charter's whole vocabulary ranked the block-cipher paper ABOVE an on-beat
+ * story about a new cloud region, because words like "data" and "source" match
+ * everything. The category is coarser than either and it actually holds.
+ */
+const WIRE_CATEGORIES = ["cs.", "stat.ML", "eess.SY"];
+
+function onTopic(entry: string): boolean {
+  const terms = [...entry.matchAll(/<category[^>]*term="([^"]+)"/g)].map((m) => m[1]);
+  if (!terms.length) return true; // no tags to judge on — let the editor decide
+  return terms.some((t) => WIRE_CATEGORIES.some((c) => t.startsWith(c)));
+}
+
+/** Words that carry no meaning in a search expression. */
+const ARXIV_STOPWORDS = new Set([
+  "the", "a", "an", "and", "or", "of", "for", "in", "on", "to",
+  "with", "by", "its", "new", "how", "why",
+]);
+
+/**
+ * arXiv is searched for the keyword's TERMS, not the keyword as a phrase.
+ *
+ * This adapter had quietly stopped contributing. A charter's queries are news
+ * vocabulary — "AI-Specific Chip Architectures", "Regulatory sandboxes for AI" —
+ * and `all:"..."` demands that exact string appear in a paper, which it almost
+ * never does. Measured across both live charters: phrase search returned 0–4
+ * results for 20 of 26 queries and nothing at all for 6, while ANDing the
+ * content words returned a full page for 25 of 26. Kaveri had seen three arXiv
+ * items in ninety-nine judgements.
+ *
+ * That mattered more than the count suggests, because arXiv is the source whose
+ * candidates actually clear the editorial bar — average score 46 and 37 against
+ * roughly 25 for syndicated news, and three of the first eight dispatches. The
+ * wire had lost its best supply and the failure was invisible: the adapter kept
+ * reporting success, because zero results is a successful search.
+ */
+function arxivExpression(keyword: string): string {
+  const terms = keyword
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !ARXIV_STOPWORDS.has(w));
+
+  // Scoped to the abstract and ANDed, then sorted by date at the call site.
+  //
+  // Sorting by arXiv's own relevance was tried and rejected on measurement: it
+  // returns beautifully on-topic papers — "Operationalising AI Regulatory
+  // Sandboxes under the EU AI Act" for exactly that query — but only 4 of 11 and
+  // 4 of 15 keywords produced anything inside the fourteen-day window, because
+  // relevance ranking ignores when a paper was posted. Date ordering keeps the
+  // wire's freshness guarantee; topical fit is enforced afterwards in
+  // buildDesk(), against the agent's whole beat rather than one keyword.
+  return terms.length ? terms.map((w) => `abs:${w}`).join(" AND ") : `all:"${keyword}"`;
+}
+
 async function arxivQuery(keyword: string): Promise<Candidate[]> {
   const url =
-    `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(`"${keyword}"`)}` +
+    `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(arxivExpression(keyword))}` +
     `&sortBy=submittedDate&sortOrder=descending&max_results=15`;
   const xml = await get(url, "arxiv").then((r) => r.text());
 
-  return blocks(xml, "entry").map<Candidate>((entry) => {
+  return blocks(xml, "entry")
+    .filter(onTopic)
+    .map<Candidate>((entry) => {
     // A revised preprint is news on its revision date, not its original one.
     const published = tag(entry, "published") ?? "";
     const updated = tag(entry, "updated") ?? "";
