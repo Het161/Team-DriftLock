@@ -12,7 +12,19 @@ import {
 } from "@/lib/queries";
 import { wireDate, ago } from "@/lib/format";
 
-export const dynamic = "force-dynamic";
+/**
+ * Cached at the edge, regenerated every 30 seconds.
+ *
+ * This was `force-dynamic`, which meant every visitor paid for a cold function
+ * plus two round trips to Atlas — measured at 2.3s warm and worse cold, against
+ * only 373ms of actual server work. The page is a showcase; nothing on it needs
+ * to be accurate to the second. Next serves the cached copy immediately and
+ * regenerates behind it, so a reader waits for the network and nothing else.
+ *
+ * The feed API is deliberately NOT cached — see app/api/agent/feed/route.ts.
+ * That is the contract, and it answers live.
+ */
+export const revalidate = 30;
 
 /**
  * The front page.
@@ -25,17 +37,18 @@ export const dynamic = "force-dynamic";
  * does not prove better.
  */
 export default async function Home() {
-  const agent = await getDemoAgent();
+  // getPublications does not depend on which agent is featured, so it goes in
+  // the first round trip rather than waiting for one it has no need of.
+  const [agent, publications] = await Promise.all([getDemoAgent(), getPublications()]);
 
   // Before any agent exists the product still has to explain itself.
   if (!agent) return <ColdStart />;
 
-  const [dispatches, spikes, runs, status, publications] = await Promise.all([
+  const [dispatches, spikes, runs, status] = await Promise.all([
     getDispatches(agent.agentId, 3),
     getSpikes(agent.agentId, 3),
     getRuns(agent.agentId, 12),
     getWireStatus(agent.agentId),
-    getPublications(),
   ]);
 
   const lastPublished = runs.find((r) => r.outcome === "published");
