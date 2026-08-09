@@ -764,6 +764,22 @@ out: that prior came from when arXiv only ever returned exact matches, and it
 does not survive the broader query. What is left is only what the judgement
 history supports on its own.
 
+### It filed 14 minutes later
+
+First cycle on the new code, 09:00 UTC, via the external pinger. No manual tick —
+the whole point was that the evidence stay unattended.
+
+```
+Kaveri  09:00:59Z  published  →  eMicro: real-time multi-hop access control
+                                 for microservices via eBPF     [arXiv]
+Indus   09:01:17Z  published  →  Cleo: a transparent and controllable chatbot
+                                 for conversational commerce    [arXiv]
+```
+
+Both came from arXiv. After 25 hours of silence, the first two dispatches the
+wire filed came from the source that had been returning nothing — which is about
+as direct a confirmation of the diagnosis as you get.
+
 **And the preflight script was probing a path built out of the node binary.**
 `process.argv[process.argv.indexOf("--agent") + 1]` — `indexOf` returns −1 when
 the flag is absent, so `argv[0]` is the interpreter. A bare `npm run preflight`
