@@ -12,11 +12,16 @@ import {
   getSpikeCounts,
   getRuns,
   getWireStatus,
+  getAgentIds,
 } from "@/lib/queries";
 import { ago } from "@/lib/format";
 
 /** Ten seconds, for the same reason as the wire page. */
 export const revalidate = 10;
+
+export async function generateStaticParams() {
+  return (await getAgentIds()).map((agentId) => ({ agentId }));
+}
 
 type Props = { params: Promise<{ agentId: string }> };
 

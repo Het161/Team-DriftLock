@@ -144,3 +144,23 @@ export async function getWireStatus(agentId: string): Promise<WireStatus> {
     tickCount,
   };
 }
+
+/**
+ * Agent ids to prerender at build time.
+ *
+ * Exists so the wire and newsroom pages get an ISR cache at all. Setting
+ * `revalidate` on a dynamic segment does nothing on its own — without
+ * generateStaticParams, Next renders it on demand for every request, which is
+ * how those two pages kept costing a visitor 4.3 seconds on a cold function
+ * while the config said ten-second caching.
+ *
+ * `dynamicParams` stays at its default of true, so an agent created after the
+ * build — the evaluator's — still renders on first request and is cached from
+ * then on. This only decides what is warm before anyone asks.
+ */
+export async function getAgentIds(): Promise<string[]> {
+  const docs = await (await agents())
+    .find({ status: "active" }, { projection: { _id: 0, agentId: 1 } })
+    .toArray();
+  return docs.map((a) => a.agentId);
+}

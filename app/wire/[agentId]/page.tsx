@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Nameplate } from "@/components/Nameplate";
 import { Dispatch } from "@/components/Dispatch";
-import { getAgent, getDispatches, getWireStatus } from "@/lib/queries";
+import { getAgent, getAgentIds, getDispatches, getWireStatus } from "@/lib/queries";
 import { wireClock, ago } from "@/lib/format";
 
 /**
@@ -19,6 +19,15 @@ import { wireClock, ago } from "@/lib/format";
  * GET /api/agent/feed, which stays uncached — that is the contract.
  */
 export const revalidate = 10;
+
+/**
+ * The existing agents, warm before anyone asks. `dynamicParams` stays at its
+ * default of true, so an agent created after the build still renders on first
+ * request and is cached from then on.
+ */
+export async function generateStaticParams() {
+  return (await getAgentIds()).map((agentId) => ({ agentId }));
+}
 
 type Props = { params: Promise<{ agentId: string }> };
 
