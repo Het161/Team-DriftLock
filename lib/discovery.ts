@@ -13,8 +13,16 @@
  * 1. Freshness is per-source. A blanket 48-hour window silently deleted arXiv
  *    from the wire entirely — for a niche query the newest matching preprint is
  *    routinely four or five days old. That is not staleness, it is how preprints
- *    move, so arXiv gets a wider window. News keeps 48 hours, where five days
- *    genuinely is stale.
+ *    move, so arXiv gets a much wider window.
+ *
+ *    News sits at 72 hours, raised from 48 after the wire went a full day
+ *    without filing. The cause was not a fault: these queries return a median
+ *    article age of 721 hours, so the filter was correctly discarding almost
+ *    everything, and the little that survived the agents had already spiked.
+ *    Measured against a two-day-old agent at that moment: 48h left 7 unseen
+ *    candidates, 72h left 32, 96h left 50. 72 was taken because a wire filing
+ *    three analytical takes a day can legitimately comment on something from
+ *    the last three days; four felt like stretching the word "news".
  *
  * 2. Bing News exists here because Google News RSS emits opaque
  *    news.google.com/rss/articles/CBMi… links that only resolve via in-page
@@ -75,9 +83,9 @@ const FETCH_TIMEOUT_MS: Record<SourceKey, number> = {
 
 /** See the note above: preprints and news age at completely different rates. */
 const MAX_AGE_HOURS: Record<SourceKey, number> = {
-  hackernews: 48,
-  googlenews: 48,
-  bingnews: 48,
+  hackernews: 72,
+  googlenews: 72,
+  bingnews: 72,
   arxiv: 14 * 24,
 };
 
@@ -114,7 +122,7 @@ function isAggregator(url: string): boolean {
   }
 }
 
-const UA = "TAAR/1.0 (autonomous wire service; https://github.com/Het161/taar)";
+const UA = "TAAR/1.0 (autonomous wire service; https://github.com/Het161/Team-DriftLock)";
 
 /* -------------------------------------------------------------------------- */
 /* Entry point                                                                 */
