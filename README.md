@@ -498,7 +498,9 @@ each of which would have shipped as a silent defect:
 | The spec's Gemini fallback works | `gemini-2.0-flash` returns `429 limit: 0` on this key. Found before writing a line of the LLM layer. |
 | Breeth is a document store | It is a knowledge graph. A terse episode produced **1 entity and 0 edges** and was unrecallable; the same facts as full sentences naming the agent produced **8 and 6**. This rewrote the memory layer. |
 | News is news | Google News RSS emits opaque redirects that resolve only via in-page JavaScript — poor things to publish as sources. Bing News wraps the real publisher URL in a query parameter, so it was added alongside. |
-| A 48-hour freshness window is fine | It silently deleted arXiv from the wire: for a niche query the newest matching preprint is routinely 4–5 days old. Freshness is now per-source. |
+| A 48-hour freshness window is fine | It silently deleted arXiv from the wire: for a niche query the newest matching preprint is routinely 4–5 days old. Freshness is now per-source. Raised again to 72h for news once measurement showed these queries return a **median article age of 721 hours**. |
+| The arXiv adapter works because it reports `ok` | It had returned almost nothing for two days. It searched `all:"<keyword>"` — an exact phrase — and a charter's queries are news vocabulary. Across 26 live keywords, phrase search returned 0–4 results for most and nothing at all for six; ANDing the terms returns a full page for 25 of 26. **Zero results is a successful search**, so nothing ever logged it. |
+| Broader retrieval just needs better ranking | Two ranking fixes were built and deleted on measurement. arXiv's own relevance sort is superbly on-topic but ignores submission date — only 4 of 11 keywords yielded anything inside the freshness window. Scoring against the charter's whole vocabulary ranked a block-cipher paper **above** an on-beat cloud-region story, because words like "data" and "source" match everything. Filtering on the paper's own arXiv subject class is coarser and holds. |
 | One fetch budget fits all adapters | arXiv answered in **15.8s** cold against a shared 10s budget — the wire was discarding research and logging it as a timeout. |
 | `x-ratelimit-remaining-requests` shows the budget | It read **998/1000** while the account was at **96.7k of 100k daily tokens**. Groq's real ceiling is tokens per day and appears only inside the body of the 429. |
 | The fallback is tested | It had **never worked**. It was pinned to Gemini's `v1` path on the strength of a probe that sent neither a system instruction nor JSON mode — and `v1` rejects both. It passed a test it could only fail in production. |
@@ -514,6 +516,18 @@ was green — 10/10 Actions runs, both schedulers alive, zero errors — while t
 wire had been silent for nine and a half hours, because a `hold` verdict was
 being treated as a permanent refusal and the editor was burning its own
 candidate pool. Nothing had crashed. It was working exactly as written.
+
+It caught the same shape of failure a second time, on judging morning: a full
+day with nothing filed, 80 overnight cycles, zero errors, every check green. The
+diagnosis came from reading back the **177 scored judgements the agents had
+already written down** — which showed arXiv, the source supplying three of the
+first eight dispatches, contributing three candidates in ninety-nine judgements
+on a beat called AI Infrastructure.
+
+Both times the broken component was one reporting success while returning
+nothing, and both times the evidence was already in the database. The runs
+collection and the rejection log were built as an audit trail for judges. They
+turned out to be the only instrumentation that worked.
 
 ---
 
