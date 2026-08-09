@@ -42,6 +42,7 @@ const SHORT = {
   "006": "The silence",
   "007": "Providers",
   "008": "Lockdown",
+  "009": "Quiet Sunday",
 };
 
 function readSessions() {

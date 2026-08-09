@@ -28,6 +28,9 @@ The parts where things worked are boring and the README already covers them.
         09:24  ┃ 007  second editor; four provider failures in one hour
         10:14  ┃      ▓ CODE FREEZE — lib/ untouched from here
         21:13  ┃ 008  lockdown: secrets, budget, 10h47m unattended soak
+─────────────────────────────────────────────────────────────────────
+09 Aug  13:35  ┃ 009  ✗ a full day with nothing filed — freshness, not a fault
+        13:41  ┃      ▓ freeze broken once, deliberately, for one constant
 ```
 
 **47 commits. 8 sessions. 2 live editors. 1 nine-and-a-half-hour outage that
@@ -60,6 +63,8 @@ nine and a half hours while every check reported green.
 | [006](#006--the-silence) | Morning check | "check all things now" | **Every check green. Product broken.** A `hold` was being treated as permanent. The editor ate its own candidate pool and went quiet for 9½ hours |
 | [007](#007--four-things-break-at-once) | Second editor | Stand up a second publication, prove nothing is persona-specific | **The fallback had never worked once.** Tokens, not requests, were the real ceiling — and I'd told the user we had 7× headroom while sitting at 96.7k of 100k |
 | [008](#008--lockdown) | Freeze & ship | Secrets, last tests, measured budget, then stop touching it | The secret scanner couldn't see Markdown. The rotation list was missing the database password. My own budget guard watched the wrong bucket |
+
+| [009](#009--the-quiet-sunday) | Judging day | "so since morning no post created?" | **A full day with nothing filed.** Not a fault — a 48h filter correctly binning articles whose median age was 721 hours, against agents that had already spiked everything newer |
 
 **Short on time?** Read [006](#006--the-silence). It's the one where nothing had
 crashed, every check was green, and the product was completely broken anyway.
@@ -622,3 +627,80 @@ in a picture.
 **Write down what you didn't fix, and why.** Roughly half the value of this file
 is the things left alone on purpose — aggregator links, prompts that could be
 tuned — with the reasoning attached, so nobody has to rediscover the trade-off.
+
+---
+
+## 009 · The quiet Sunday
+
+**09 Aug, 13:35 IST** · commit `3600c68`
+
+### The prompt
+
+> "so since morning no post created?"
+
+### What I found
+
+Nothing had published in 15 hours. Kaveri's newest dispatch was 24 hours old, on
+the morning of judging day. Meanwhile: 80 cycles overnight, zero errors, both
+schedulers alive, every check green. Session 006 all over again, except this
+time it wasn't the same cause.
+
+Measured on the real code path rather than guessed:
+
+```
+pass 1 (normal):    found  2   fresh 0
+pass 2 (widening):  found 10   fresh 1   → a desk of one, and it got spiked
+```
+
+### What broke
+
+**The 48-hour freshness filter was binning almost everything, correctly.**
+These queries return a median article age of **721 hours** — thirty days. Of 36
+items Google News returned, exactly one was inside 48 hours. The filter was
+doing its job perfectly and starving the wire while doing it.
+
+Three things compounded: that median, Kaveri's 103 blocked URLs from two days of
+spiking, and per-cycle sampling that only ever sees a slice of the pool. None of
+them is a fault. Together they meant no fresh, on-beat, unseen story existed for
+either agent.
+
+**My own probe disagreed with the pipeline, and I nearly trusted it.** An
+exhaustive scan said 7 unseen candidates existed inside 48 hours while live
+cycles reported `fresh=0`. That looked like a bug and I was ready to treat it as
+one. It wasn't: my probe queried all 11 keywords across both news adapters, and
+a real cycle samples three. Two different measurements of two different things.
+Re-running the *exact* discovery path the tick uses — including the widening
+pass — reproduced `fresh=1` and settled it.
+
+### The fix
+
+One constant. News freshness 48h → 72h; arXiv keeps its 14 days.
+
+Measured against a two-day-old agent at that moment:
+
+| Window | Unseen candidates |
+| --- | --- |
+| 48h | 7 |
+| **72h** | **32** |
+| 96h | 50 |
+
+72 rather than 96 because a wire filing three *analytical* takes a day can
+legitimately comment on something from the last three days. Four is stretching
+the word "news", and the extra 18 candidates were not worth the claim.
+
+On the same live pass after the change, Kaveri went from 0 fresh candidates to
+3 and Indus to 4. Both had a desk again.
+
+**This broke a code freeze that had held 24 hours** through a clean 10h47m
+unattended soak. It qualifies under the rule the freeze was written with — fix
+the minimum, note it, watch two cycles — because a wire that publishes nothing
+on judging day is broken in the way that matters, even though nothing was
+failing.
+
+### What it says about the design
+
+The honest reading is that 48 hours was never measured, just chosen. It survived
+two days because the agents were new and everything was fresh to them. The
+limitation only appears once an agent has been running long enough to exhaust
+its own beat, which is exactly the condition this product is built for and
+exactly the condition a two-day hackathon does not naturally reach.
