@@ -64,7 +64,7 @@ nine and a half hours while every check reported green.
 | [007](#007--four-things-break-at-once) | Second editor | Stand up a second publication, prove nothing is persona-specific | **The fallback had never worked once.** Tokens, not requests, were the real ceiling — and I'd told the user we had 7× headroom while sitting at 96.7k of 100k |
 | [008](#008--lockdown) | Freeze & ship | Secrets, last tests, measured budget, then stop touching it | The secret scanner couldn't see Markdown. The rotation list was missing the database password. My own budget guard watched the wrong bucket |
 
-| [009](#009--the-quiet-sunday) | Judging day | "so since morning no post created?" | **A full day with nothing filed.** Not a fault — a 48h filter correctly binning articles whose median age was 721 hours, against agents that had already spiked everything newer |
+| [009](#009--the-quiet-sunday) | Judging day | "so since morning no post created?" | **A full day with nothing filed**, from two causes and neither one an error: a 48h filter correctly binning articles whose median age was 721 hours, and an arXiv adapter that had returned nothing for two days while reporting success every cycle |
 
 **Short on time?** Read [006](#006--the-silence). It's the one where nothing had
 crashed, every check was green, and the product was completely broken anyway.
@@ -632,7 +632,7 @@ tuned — with the reasoning attached, so nobody has to rediscover the trade-off
 
 ## 009 · The quiet Sunday
 
-**09 Aug, 13:35 IST** · commit `3600c68`
+**09 Aug, 13:35 IST** · commits `3600c68`, `efff11f`
 
 ### The prompt
 
@@ -704,3 +704,78 @@ two days because the agents were new and everything was fresh to them. The
 limitation only appears once an agent has been running long enough to exhaust
 its own beat, which is exactly the condition this product is built for and
 exactly the condition a two-day hackathon does not naturally reach.
+
+### Then it stayed quiet anyway
+
+The freshness fix widened supply and the wire still filed nothing. Two cycles
+later: `26 found · 1 fresh · 1 spiked`. So I stopped reasoning about it and read
+the 177 scored judgements the agents had already written down.
+
+| Source | n | Avg score | Cleared the bar |
+| --- | --- | --- | --- |
+| arXiv (Indus) | 19 | 37.1 | 3 of 8 dispatches |
+| arXiv (Kaveri) | **3** | 46.0 | — |
+| msn.com, Yahoo shells | 32 | ~25 | never |
+
+Kaveri had seen **three arXiv candidates in ninety-nine judgements**, on a beat
+called AI Infrastructure. arXiv was querying `all:"<keyword>"` — an exact-phrase
+match — and a charter's queries are news vocabulary. "AI-Specific Chip
+Architectures" is not a phrase that appears in a paper.
+
+```
+                          phrase   AND-terms
+Sustainable AI Data Centers    3          15
+Edge Computing for Real-Time AI 0         15
+Regulatory sandboxes for AI     0         15
+→ 26 keywords, both charters:  most returned 0–4      25 of 26 returned a full page
+```
+
+**The failure was invisible because zero results is a successful search.** The
+adapter reported `ok` every cycle for two days. Nothing was ever logged. The
+wire had lost its best supply and every green check stayed green — the same
+shape as session 006, found a second way.
+
+### Three fixes tried, two rejected on measurement
+
+Broadening the query cost precision: the terms of "AI-Specific Chip
+Architectures" match a paper on X-ray CCDs and one on the Kalyna block cipher.
+Both contain every word and none of the subject.
+
+1. **arXiv's own relevance sort.** Beautifully on-topic — "Operationalising AI
+   Regulatory Sandboxes under the EU AI Act" for exactly that query. Rejected:
+   relevance ranking ignores submission date, and only 4 of 11 and 4 of 15
+   keywords produced anything inside the fourteen-day window.
+2. **Require the keyword's two-word core to appear intact.** Rejected: cut arXiv
+   from fifteen candidates to one. That is the silence again.
+3. **Score candidates against the charter's whole vocabulary.** Written, tested,
+   deleted. It ranked the block-cipher paper *above* an on-beat story about a new
+   cloud region, because words like "data" and "source" match everything.
+
+What shipped is coarser than any of them and actually holds: **filter on the
+paper's own subject class.** A technology wire covers `cs.*`; the CCD paper is
+astrophysics and the amygdala paper is quantitative biology. Supply after the
+change, on the live path: Kaveri 1 fresh candidate → 12, Indus → 14.
+
+The desk changed too. It was `fresh.slice(0, 6)` — arrival order — and reprints
+were about a third of every desk at an average of 25, having never once cleared
+the bar. Since a spike is permanent, each slot they took also burned a candidate
+for good. It is ranked now. A source-class bonus for arXiv went in and came back
+out: that prior came from when arXiv only ever returned exact matches, and it
+does not survive the broader query. What is left is only what the judgement
+history supports on its own.
+
+**And the preflight script was probing a path built out of the node binary.**
+`process.argv[process.argv.indexOf("--agent") + 1]` — `indexOf` returns −1 when
+the flag is absent, so `argv[0]` is the interpreter. A bare `npm run preflight`
+had been requesting `/wire//opt/homebrew/Cellar/node/25.8.1_1/bin/node` and
+failing two checks on a URL nobody asked for. Found by running the submission
+checklist rather than reading it.
+
+### What it says about the design
+
+Every check this project has was green through all of it. Health, schedulers,
+adapter status, the soak, the verifier — twice now the thing that was actually
+broken was a component reporting success while returning nothing, and both times
+the evidence that found it was data the agents had already written down and
+nobody had read back. The runs collection and the rejection log were built as
+audit trail. They turned out to be the only instrumentation that worked.
